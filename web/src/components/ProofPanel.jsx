@@ -42,7 +42,7 @@ function PrimitivePill({ label, highlight, isLeaf }) {
         ? 'rgba(74,158,255,0.15)'
         : isLeaf
           ? 'rgba(46,204,113,0.12)'
-          : 'var(--bg-primary)',
+          : 'var(--bg-well)',
       color: highlight ? 'var(--accent-blue)' : isLeaf ? 'var(--accent-green)' : 'var(--text-primary)',
       fontFamily: 'var(--font-mono)',
       fontSize: '0.82rem',
@@ -64,7 +64,7 @@ function Arrow({ theorem, security, active, dim }) {
       transition: 'opacity 0.3s',
     }}>
       <div style={{
-        fontSize: '0.65rem', color: 'var(--accent-gold)',
+        fontSize: '0.65rem', color: 'var(--accent-orange)',
         fontFamily: 'var(--font-mono)', marginBottom: 2,
         textAlign: 'center', maxWidth: 120,
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

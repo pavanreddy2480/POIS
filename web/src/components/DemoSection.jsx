@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import BuildPanel from './BuildPanel';
+import ReducePanel from './ReducePanel';
+import ProofPanel from './ProofPanel';
 import PA1Demo from './demos/PA1Demo';
 import PA2Demo from './demos/PA2Demo';
 import PA3Demo from './demos/PA3Demo';
@@ -21,47 +24,107 @@ import PA19Demo from './demos/PA19Demo';
 import PA20Demo from './demos/PA20Demo';
 
 const DEMOS = [
-  { id: 'PA1',  label: 'PA#1 OWF/PRG',    Component: PA1Demo },
-  { id: 'PA2',  label: 'PA#2 GGM Tree',   Component: PA2Demo },
-  { id: 'PA3',  label: 'PA#3 IND-CPA',    Component: PA3Demo },
-  { id: 'PA4',  label: 'PA#4 Modes',      Component: PA4Demo },
-  { id: 'PA5',  label: 'PA#5 MAC Forge',  Component: PA5Demo },
-  { id: 'PA6',  label: 'PA#6 Malleability', Component: PA6Demo },
-  { id: 'PA7',  label: 'PA#7 Merkle-Damgård', Component: PA7Demo },
-  { id: 'PA8',  label: 'PA#8 DLP Hash',   Component: PA8Demo },
-  { id: 'PA9',  label: 'PA#9 Birthday',   Component: PA9Demo },
-  { id: 'PA10', label: 'PA#10 HMAC',      Component: PA10Demo },
-  { id: 'PA11', label: 'PA#11 DH Exchange', Component: PA11Demo },
-  { id: 'PA12', label: 'PA#12 RSA',       Component: PA12Demo },
-  { id: 'PA13', label: 'PA#13 Miller-Rabin', Component: PA13Demo },
-  { id: 'PA14', label: 'PA#14 Håstad',    Component: PA14Demo },
-  { id: 'PA15', label: 'PA#15 Signatures', Component: PA15Demo },
-  { id: 'PA16', label: 'PA#16 ElGamal',   Component: PA16Demo },
-  { id: 'PA17', label: 'PA#17 CCA-PKC',   Component: PA17Demo },
-  { id: 'PA18', label: 'PA#18 OT',        Component: PA18Demo },
-  { id: 'PA19', label: 'PA#19 Secure AND', Component: PA19Demo },
-  { id: 'PA20', label: 'PA#20 MPC',       Component: PA20Demo },
+  { id: 'PA1',  num: 1,  label: 'OWF / PRG',        tag: 'OWF',  Component: PA1Demo },
+  { id: 'PA2',  num: 2,  label: 'GGM Tree PRF',      tag: 'PRF',  Component: PA2Demo },
+  { id: 'PA3',  num: 3,  label: 'IND-CPA Enc',       tag: 'CPA',  Component: PA3Demo },
+  { id: 'PA4',  num: 4,  label: 'Modes CBC/OFB/CTR', tag: 'PRP',  Component: PA4Demo },
+  { id: 'PA5',  num: 5,  label: 'MAC Forge',          tag: 'MAC',  Component: PA5Demo },
+  { id: 'PA6',  num: 6,  label: 'Malleability CCA',   tag: 'CCA',  Component: PA6Demo },
+  { id: 'PA7',  num: 7,  label: 'Merkle-Damgård',     tag: 'HASH', Component: PA7Demo },
+  { id: 'PA8',  num: 8,  label: 'DLP Hash',           tag: 'DLP',  Component: PA8Demo },
+  { id: 'PA9',  num: 9,  label: 'Birthday Attack',    tag: 'CRHF', Component: PA9Demo },
+  { id: 'PA10', num: 10, label: 'HMAC',               tag: 'HMAC', Component: PA10Demo },
+  { id: 'PA11', num: 11, label: 'DH Key Exchange',    tag: 'DH',   Component: PA11Demo },
+  { id: 'PA12', num: 12, label: 'RSA Encrypt',        tag: 'RSA',  Component: PA12Demo },
+  { id: 'PA13', num: 13, label: 'Miller-Rabin',       tag: 'MATH', Component: PA13Demo },
+  { id: 'PA14', num: 14, label: 'Håstad CRT Attack',  tag: 'CRT',  Component: PA14Demo },
+  { id: 'PA15', num: 15, label: 'RSA Signatures',     tag: 'SIG',  Component: PA15Demo },
+  { id: 'PA16', num: 16, label: 'ElGamal',            tag: 'EG',   Component: PA16Demo },
+  { id: 'PA17', num: 17, label: 'CCA-PKC',            tag: 'CCA',  Component: PA17Demo },
+  { id: 'PA18', num: 18, label: 'Oblivious Transfer', tag: 'OT',   Component: PA18Demo },
+  { id: 'PA19', num: 19, label: 'Secure AND',         tag: 'MPC',  Component: PA19Demo },
+  { id: 'PA20', num: 20, label: 'MPC Circuit',        tag: 'MPC',  Component: PA20Demo },
 ];
 
-export default function DemoSection() {
-  const [active, setActive] = useState('PA1');
+export default function DemoSection({
+  foundation, source, setSource, target, setTarget,
+  primitives, keyHex, setKeyHex, queryHex, setQueryHex,
+  buildSteps, reduceSteps, routeInfo,
+  proofOpen, setProofOpen, direction, proofChain, onRun,
+}) {
+  const [active, setActive] = useState('home');
   const demo = DEMOS.find(d => d.id === active);
 
   return (
-    <div className="demo-section">
-      <div className="demo-tab-bar">
+    <div className="demo-layout">
+      {/* Arc-style left nav */}
+      <nav className="demo-nav">
+        {/* Home */}
+        <div className="demo-nav-title">Explorer</div>
+        <button
+          className={`demo-nav-item${active === 'home' ? ' active' : ''}`}
+          onClick={() => setActive('home')}
+        >
+          <span className="demo-nav-num">⌂</span>
+          <span className="demo-nav-label">Reduction Explorer</span>
+          <span className="demo-nav-tag">HOME</span>
+        </button>
+
+        <div className="demo-nav-divider" />
+        <div className="demo-nav-title">Assignments</div>
+
         {DEMOS.map(d => (
           <button
             key={d.id}
-            className={`demo-tab${active === d.id ? ' active' : ''}`}
+            className={`demo-nav-item${active === d.id ? ' active' : ''}`}
             onClick={() => setActive(d.id)}
           >
-            {d.label}
+            <span className="demo-nav-num">PA{d.num}</span>
+            <span className="demo-nav-label">{d.label}</span>
+            <span className="demo-nav-tag">{d.tag}</span>
           </button>
         ))}
-      </div>
-      <div className="demo-content">
-        {demo && <demo.Component />}
+      </nav>
+
+      {/* Playground */}
+      <div className="demo-playground">
+        {active === 'home' ? (
+          <div className="explorer-panels">
+            <BuildPanel
+              foundation={foundation}
+              source={source}
+              setSource={setSource}
+              primitives={primitives}
+              keyHex={keyHex}
+              setKeyHex={setKeyHex}
+              steps={buildSteps}
+              onRun={onRun}
+            />
+            <ReducePanel
+              source={source}
+              target={target}
+              setTarget={setTarget}
+              primitives={primitives}
+              queryHex={queryHex}
+              setQueryHex={setQueryHex}
+              steps={reduceSteps}
+              routeInfo={routeInfo}
+              onRun={onRun}
+            />
+            <ProofPanel
+              open={proofOpen}
+              setOpen={setProofOpen}
+              foundation={foundation}
+              source={source}
+              target={target}
+              direction={direction}
+              proofChain={proofChain}
+              routeInfo={routeInfo}
+            />
+          </div>
+        ) : (
+          demo && <demo.Component />
+        )}
       </div>
     </div>
   );

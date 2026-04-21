@@ -59,7 +59,7 @@ export default function PA20Demo() {
               style={{ width: '100%' }} />
           </div>
           <div style={{ flex: 1 }}>
-            <label style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: '0.85rem', color: 'var(--accent-orange)', display: 'block', marginBottom: 4 }}>
               Bob: y = {clampedY}
             </label>
             <input type="range" min={0} max={maxVal} value={clampedY}
@@ -79,8 +79,8 @@ export default function PA20Demo() {
           </div>
           <div style={{ fontSize: '1.2rem', color: 'var(--text-secondary)' }}>vs</div>
           <div style={{ textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', marginBottom: 4 }}>Bob</div>
-            <div style={{ fontSize: '2.2rem', fontWeight: 700, color: 'var(--accent-gold)' }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--accent-orange)', marginBottom: 4 }}>Bob</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 700, color: 'var(--accent-orange)' }}>
               {'$'.repeat(clampedY)}
               {clampedY === 0 && <span style={{ opacity: 0.3 }}>$</span>}
             </div>

@@ -38,16 +38,16 @@ function GGMTreeSVG({ path, query }) {
   }
 
   return (
-    <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ overflow: 'visible', maxHeight: 300 }}>
+    <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} style={{ overflow: 'visible', maxHeight: 360 }}>
       {edges.map((e, i) => (
         <g key={i}>
           <line x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-            stroke={e.active ? 'var(--accent-blue)' : '#333'}
+            stroke={e.active ? 'var(--accent-blue)' : 'var(--border)'}
             strokeWidth={e.active ? 2 : 1}
             strokeDasharray={e.active ? 'none' : '4,3'}
           />
           <text x={(e.x1 + e.x2) / 2 + 4} y={(e.y1 + e.y2) / 2}
-            fontSize="10" fill={e.active ? 'var(--accent-blue)' : '#555'}
+            fontSize="10" fill={e.active ? 'var(--accent-blue)' : 'var(--text-muted)'}
             fontFamily="var(--font-mono)">
             {e.label}
           </text>
@@ -56,22 +56,27 @@ function GGMTreeSVG({ path, query }) {
       {nodes.map((n, i) => (
         <g key={i}>
           <rect x={n.x} y={n.y} width={nodeW} height={nodeH} rx={6}
-            fill={n.active ? (n.level === depth ? 'rgba(46,204,113,0.15)' : 'rgba(74,158,255,0.15)') : 'rgba(50,50,70,0.5)'}
-            stroke={n.active ? (n.level === depth ? 'var(--accent-green)' : 'var(--accent-blue)') : '#444'}
+            fill={n.active
+              ? (n.level === depth ? 'var(--accent-green-bg)' : 'var(--accent-blue-bg)')
+              : 'var(--bg-well)'}
+            stroke={n.active
+              ? (n.level === depth ? 'var(--accent-green)' : 'var(--accent-blue)')
+              : 'var(--border)'}
             strokeWidth={n.active ? (n.level === depth ? 2 : 1.5) : 1}
           />
           <text x={n.x + nodeW / 2} y={n.y + nodeH / 2 + 4}
-            textAnchor="middle" fontSize="11" fill={n.active ? '#e8eaf6' : '#555'}
+            textAnchor="middle" fontSize="11"
+            fill={n.active ? 'var(--text-primary)' : 'var(--text-muted)'}
             fontFamily="var(--font-mono)">
             {n.label}
           </text>
           {n.level === 0 && (
-            <text x={n.x + nodeW / 2} y={n.y - 5} textAnchor="middle" fontSize="9" fill="var(--accent-gold)">
+            <text x={n.x + nodeW / 2} y={n.y - 6} textAnchor="middle" fontSize="9" fill="var(--accent-orange)">
               root k
             </text>
           )}
           {n.level === depth && n.active && (
-            <text x={n.x + nodeW / 2} y={n.y + nodeH + 12} textAnchor="middle" fontSize="10" fill="var(--accent-green)">
+            <text x={n.x + nodeW / 2} y={n.y + nodeH + 14} textAnchor="middle" fontSize="10" fill="var(--accent-green)">
               F_k(x)
             </text>
           )}
@@ -130,7 +135,7 @@ export default function PA2Demo() {
           <div className="form-group">
             <label>Depth</label>
             <select value={depth} onChange={e => setDepth(+e.target.value)}
-              style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px' }}>
+              style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 8px' }}>
               {[2, 3, 4, 5, 6].map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
@@ -150,7 +155,7 @@ export default function PA2Demo() {
                 }}
                 style={{
                   width: 32, height: 32, borderRadius: 6, border: '1px solid var(--border)',
-                  background: bit === '1' ? 'rgba(74,158,255,0.2)' : 'var(--bg-primary)',
+                  background: bit === '1' ? 'var(--accent-blue-bg)' : 'var(--bg-well)',
                   color: bit === '1' ? 'var(--accent-blue)' : 'var(--text-secondary)',
                   fontFamily: 'var(--font-mono)', cursor: 'pointer', fontSize: '0.85rem',
                 }}>
@@ -165,7 +170,7 @@ export default function PA2Demo() {
 
         {tree && !tree.error && (
           <>
-            <div style={{ background: 'var(--bg-primary)', borderRadius: 8, padding: '12px', marginBottom: 10, border: '1px solid var(--border)' }}>
+            <div style={{ background: 'var(--bg-well)', borderRadius: 8, padding: '16px 12px', marginBottom: 10, border: '1px solid var(--border-light)' }}>
               <GGMTreeSVG path={tree.path || []} query={query} />
             </div>
             <div className="result-box">

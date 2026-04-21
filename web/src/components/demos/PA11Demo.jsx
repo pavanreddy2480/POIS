@@ -45,7 +45,7 @@ export default function PA11Demo() {
               </div>
             </div>
             <div className="demo-half">
-              <h5 style={{ color: 'var(--accent-gold)' }}>Bob</h5>
+              <h5 style={{ color: 'var(--accent-orange)' }}>Bob</h5>
               <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
                 <div>Private b: {result.bob_private?.slice(0,10)}…</div>
                 <div>Public B=g^b: {result.bob_public?.slice(0,10)}…</div>

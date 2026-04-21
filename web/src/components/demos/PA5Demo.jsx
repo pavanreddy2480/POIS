@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
 
-const HIDDEN_KEY = '8f3a1b2c4d5e6f70';
+const HIDDEN_KEY = '8f3a1b2c4d5e6f708f3a1b2c4d5e6f70';
 
 export default function PA5Demo() {
   const [signedMsgs, setSignedMsgs] = useState([]);

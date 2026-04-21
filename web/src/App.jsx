@@ -20,6 +20,11 @@ export default function App() {
   const [reduceSteps, setReduceSteps] = useState([]);
   const [loading, setLoading]       = useState(false);
   const [routeInfo, setRouteInfo]   = useState(null);
+  const [darkMode, setDarkMode]     = useState(false);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  }, [darkMode]);
 
   const runComputations = useCallback(async () => {
     if (!keyHex || keyHex.length < 8) return;
@@ -109,66 +114,46 @@ export default function App() {
       {/* Top Bar */}
       <div className="top-bar">
         <h1>CS8.401 · Minicrypt Clique Explorer</h1>
+        <div className="top-bar-spacer" />
+        {/* Foundation toggle in top bar */}
         <div className="foundation-toggle">
-          <button className={foundation==='AES'?'active':''} onClick={()=>setFoundation('AES')}>
-            AES-128 (PRP)
-          </button>
-          <button className={foundation==='DLP'?'active':''} onClick={()=>setFoundation('DLP')}>
-            DLP (g^x mod p)
-          </button>
+          <button className={foundation==='AES'?'active':''} onClick={()=>setFoundation('AES')}>AES-128</button>
+          <button className={foundation==='DLP'?'active':''} onClick={()=>setFoundation('DLP')}>DLP</button>
         </div>
-        <span className="foundation-badge">Foundation: {foundation}</span>
+        {/* Direction toggle */}
         <div className="direction-toggle">
-          <span>Direction:</span>
-          <button className={direction==='forward'?'active':''} onClick={()=>setDirection('forward')}>
-            Forward (A→B)
-          </button>
-          <button className={direction==='backward'?'active':''} onClick={()=>setDirection('backward')}>
-            Backward (B→A)
-          </button>
+          <button className={direction==='forward'?'active':''} onClick={()=>setDirection('forward')}>A→B</button>
+          <button className={direction==='backward'?'active':''} onClick={()=>setDirection('backward')}>B→A</button>
         </div>
+        <button className="btn btn-secondary theme-toggle" onClick={() => setDarkMode(d => !d)}>
+          {darkMode ? '☀ Light' : '☾ Dark'}
+        </button>
         {loading && <div className="spinner" />}
       </div>
 
-      {/* Two-Column Main */}
-      <div className="two-column">
-        <BuildPanel
+      {/* Full playground — DemoSection owns the PA nav sidebar */}
+      <div className="app-body">
+        <DemoSection
           foundation={foundation}
           source={source}
           setSource={setSource}
-          primitives={PRIMITIVES}
-          keyHex={keyHex}
-          setKeyHex={handleKeyChange}
-          steps={buildSteps}
-          onRun={runComputations}
-        />
-        <ReducePanel
-          source={source}
           target={target}
           setTarget={setTarget}
           primitives={PRIMITIVES}
+          keyHex={keyHex}
+          setKeyHex={handleKeyChange}
           queryHex={queryHex}
           setQueryHex={handleQueryChange}
-          steps={reduceSteps}
+          buildSteps={buildSteps}
+          reduceSteps={reduceSteps}
           routeInfo={routeInfo}
+          proofOpen={proofOpen}
+          setProofOpen={setProofOpen}
+          direction={direction}
+          proofChain={proofChain}
           onRun={runComputations}
         />
       </div>
-
-      {/* Proof Panel */}
-      <ProofPanel
-        open={proofOpen}
-        setOpen={setProofOpen}
-        foundation={foundation}
-        source={source}
-        target={target}
-        direction={direction}
-        proofChain={proofChain}
-        routeInfo={routeInfo}
-      />
-
-      {/* Demo Tabs Section */}
-      <DemoSection />
     </div>
   );
 }

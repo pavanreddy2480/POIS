@@ -64,7 +64,7 @@ export default function PA19Demo() {
             <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 4 }}>
               Expected a∧b
             </div>
-            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-gold)' }}>
+            <div style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-orange)' }}>
               {a & b}
             </div>
           </div>
@@ -95,7 +95,7 @@ export default function PA19Demo() {
                   style={{ background: row.a === a && row.b === b ? 'rgba(212,175,55,0.1)' : 'transparent' }}>
                   <td style={{ padding: '4px 8px' }}>{row.a}</td>
                   <td style={{ padding: '4px 8px' }}>{row.b}</td>
-                  <td style={{ padding: '4px 8px', color: 'var(--accent-gold)' }}>{row.a & row.b}</td>
+                  <td style={{ padding: '4px 8px', color: 'var(--accent-orange)' }}>{row.a & row.b}</td>
                   <td style={{ padding: '4px 8px', color: 'var(--accent-blue)' }}>{row.a ^ row.b}</td>
                   <td style={{ padding: '4px 8px', color: 'var(--text-secondary)' }}>{1 - row.a}</td>
                 </tr>
