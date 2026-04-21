@@ -44,9 +44,9 @@ class GGMPRF:
         return current
 
     def get_tree_path(self, k: bytes, x: bytes) -> list:
-        """Return list of (node_value, bit) tuples along the tree path."""
+        """Return list of dicts along the GGM tree path root→leaf."""
         assert len(k) == 16
-        path = [("root", k.hex(), None)]
+        path = [{"level": "root", "node": k.hex(), "bit": None}]
         current = k
         for i in range(self.depth):
             byte_idx = i // 8
@@ -56,7 +56,7 @@ class GGMPRF:
             else:
                 bit = 0
             current = self._G1(current) if bit else self._G0(current)
-            path.append((f"level_{i+1}", current.hex(), bit))
+            path.append({"level": i + 1, "node": current.hex(), "bit": bit})
         return path
 
 

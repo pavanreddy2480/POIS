@@ -1,6 +1,6 @@
 """
 PA#6 — CCA-Secure Encryption via Encrypt-then-MAC.
-CCA_Enc(kE, kM, m) = (CE, t) where CE = Enc(kE, m), t = Mac(kM, CE)
+CCA_Enc(kE, kM, m) = (r, c, t) where r||c = Enc(kE, m), t = Mac(kM, r||c)
 CCA_Dec: verify MAC first, reject if invalid, then decrypt.
 Depends on: PA#3 CPAEnc, PA#5 CBCMAC.
 """
@@ -25,48 +25,43 @@ class CCAEnc:
     def cca_enc(self, kE: bytes, kM: bytes, m: bytes) -> tuple:
         """
         CCA encrypt message m.
-        Returns (CE, t) where CE = (r, c) and t = MAC(kM, r||c).
+        Returns (r, c, t) where t = MAC(kM, r||c).
         """
         r, c = self.enc.enc(kE, m)
-        CE = r + c  # concatenate nonce and ciphertext
+        CE = r + c  # concatenated for MAC input (encrypt-then-MAC)
         t = self.mac.mac(kM, CE)
-        return CE, t
+        return r, c, t
 
-    def cca_dec(self, kE: bytes, kM: bytes, c: bytes, t: bytes):
+    def cca_dec(self, kE: bytes, kM: bytes, r: bytes, c: bytes, t: bytes):
         """
-        CCA decrypt.
+        CCA decrypt. Verifies MAC FIRST, then decrypts.
         Returns plaintext or None if MAC verification fails.
         """
-        # Step 1: Verify MAC FIRST
-        if not self.mac.vrfy(kM, c, t):
+        CE = r + c
+        # Verify MAC FIRST (encrypt-then-MAC)
+        if not self.mac.vrfy(kM, CE, t):
             return None  # Reject: MAC invalid
-        # Step 2: Decrypt
-        r = c[:16]
-        ct = c[16:]
-        return self.enc.dec(kE, r, ct)
+        return self.enc.dec(kE, r, c)
 
-    def malleability_demo(self, kE: bytes, m: bytes) -> dict:
+    def malleability_demo(self, kE: bytes, kM: bytes, m: bytes) -> dict:
         """
         Demonstrate that CPA-only encryption is malleable.
         With CCA (Encrypt-then-MAC) the malleability attack fails.
         """
         # CPA encryption (no MAC protection)
-        r, c = self.enc.enc(kE, m)
+        r_cpa, c_cpa = self.enc.enc(kE, m)
+        tampered_c = bytes([c_cpa[0] ^ 0x01]) + c_cpa[1:] if c_cpa else c_cpa
 
-        # Malleability attack: flip bit 0 of first ciphertext byte
-        tampered_c = bytes([c[0] ^ 0x01]) + c[1:] if c else c
-
-        # Try CCA with tampered ciphertext (will fail MAC check)
-        cca_ct, t = self.cca_enc(kE, os.urandom(16), m)
-        fake_kM = os.urandom(16)
-        # Tamper with cca_ct
-        tampered_cca = bytes([cca_ct[0] ^ 0x01]) + cca_ct[1:]
+        # CCA encryption — tampered ciphertext fails MAC check
+        r, c, t = self.cca_enc(kE, kM, m)
+        tampered_r = bytes([r[0] ^ 0x01]) + r[1:]
+        cca_result = self.cca_dec(kE, kM, tampered_r, c, t)
 
         return {
             "original_m": m.hex(),
-            "cpa_ciphertext": c.hex(),
+            "cpa_ciphertext": c_cpa.hex(),
             "tampered_cpa_ct": tampered_c.hex(),
             "cpa_decrypts_tampered": True,  # CPA has no integrity
-            "cca_tampered_accepted": False,  # CCA rejects (MAC fails)
+            "cca_tampered_accepted": cca_result is not None,  # should be False
             "description": "Encrypt-then-MAC prevents ciphertext tampering",
         }

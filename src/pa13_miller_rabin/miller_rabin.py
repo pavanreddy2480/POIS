@@ -96,14 +96,16 @@ def gen_safe_prime(bits: int) -> tuple:
 
 def carmichael_demo():
     """Show that n=561 passes naive Fermat but fails Miller-Rabin."""
-    n = 561
-    fermat_passes = all(pow(a, n-1, n) == 1 for a in range(2, 10))
+    n = 561  # 561 = 3 * 11 * 17
+    # Use only values coprime to 561 (avoid 3, 11, 17 and multiples)
+    coprime_bases = [a for a in range(2, 20) if all(a % f != 0 for f in [3, 11, 17])]
+    fermat_passes = all(pow(a, n - 1, n) == 1 for a in coprime_bases[:8])
     mr_result = miller_rabin(n, 5)
     return {
         "n": n,
         "fermat_passes": fermat_passes,
         "miller_rabin": mr_result,
-        "is_carmichael": fermat_passes and mr_result == "COMPOSITE"
+        "is_carmichael": fermat_passes and mr_result == "COMPOSITE",
     }
 
 

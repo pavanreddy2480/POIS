@@ -381,6 +381,7 @@ The FastAPI server runs at `http://localhost:8000`. Interactive docs at `/docs`.
 | `/api/secure_and/compute` | POST | Secure AND/XOR/NOT |
 | `/api/mpc/millionaire` | POST | Millionaire's problem |
 | `/api/reduce` | POST | Reduction path lookup |
+| `/api/reduce/all` | GET | All 27+ reduction pairs in routing table |
 
 ---
 

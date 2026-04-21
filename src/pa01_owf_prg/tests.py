@@ -64,8 +64,9 @@ def test_prg_length_doubling():
 
 def test_dlp_verify_hardness():
     owf = DLPOWF(bits=16)
-    msg = owf.verify_hardness()
-    assert "DLP" in msg
+    result = owf.verify_hardness()
+    assert "DLP" in result["hardness"]
+    assert "p" in result and "q" in result
 
 if __name__ == "__main__":
     import pytest

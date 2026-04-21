@@ -71,9 +71,9 @@ class DLPHashGroup:
         else:
             # Generate a fresh group (slow for large bits)
             from src.pa01_owf_prg.owf import _gen_safe_prime
-            import random as _rand
             self.p, self.q, self.g = _gen_safe_prime(min(bits, 32))
-            alpha = _rand.randint(2, self.q - 1)
+            nbytes = max(1, (self.q.bit_length() + 7) // 8)
+            alpha = int.from_bytes(os.urandom(nbytes), 'big') % (self.q - 2) + 2
             self.h = pow(self.g, alpha, self.p)
             # alpha is NOT stored
 

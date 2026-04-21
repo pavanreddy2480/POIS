@@ -47,7 +47,7 @@ def get_prg():
 def get_ggm_prf():
     if "ggm_prf" not in _singletons:
         from src.pa02_prf.prf import GGMPRF
-        _singletons["ggm_prf"] = GGMPRF(get_prg())
+        _singletons["ggm_prf"] = GGMPRF(depth=8)
     return _singletons["ggm_prf"]
 
 def get_cpa_enc():
@@ -268,8 +268,8 @@ def prf_ggm_tree(req: PRFRequest):
         return {
             "key": req.key_hex,
             "query": req.input_hex,
-            "path": [{"bit": p["bit"], "node": p["node"].hex()} for p in path],
-            "output": path[-1]["node"].hex() if path else k.hex(),
+            "path": [{"level": p["level"], "bit": p["bit"], "node": p["node"]} for p in path],
+            "output": path[-1]["node"] if path else k.hex(),
         }
     except Exception as e:
         raise HTTPException(400, str(e))
@@ -784,55 +784,211 @@ def cca_demo(req: CCADemoRequest):
 # ── Routing table (clique reduction paths) ────────────────────────────────────
 
 ROUTING_TABLE = {
+    # ── Forward reductions ────────────────────────────────────────────────
     ("OWF", "PRG"): {
         "steps": ["OWF → PRG (HILL hard-core bit construction)"],
         "theorem": "HILL Theorem",
         "pa": "PA#1",
         "direction": "forward",
+        "security_claim": "If adversary breaks PRG with advantage ε, it breaks OWF with advantage ε' ≥ ε/n",
     },
     ("OWF", "OWP"): {
         "steps": ["OWF → OWP (DLP: f(x)=g^x mod p is a OWP on Z_q)"],
         "theorem": "DLP OWP",
         "pa": "PA#1",
         "direction": "forward",
+        "security_claim": "f(x)=g^x mod p is both one-way and a permutation on Z_q under DLP",
     },
     ("PRG", "PRF"): {
         "steps": ["PRG → PRF (GGM tree construction)"],
         "theorem": "GGM Theorem",
         "pa": "PA#2",
         "direction": "forward",
+        "security_claim": "If adversary breaks PRF with advantage ε in 2^n queries, it breaks PRG with advantage ε' ≥ ε/n",
     },
     ("PRF", "PRP"): {
         "steps": ["PRF → PRP (Luby-Rackoff 3-round Feistel)"],
         "theorem": "Luby-Rackoff",
         "pa": "PA#4",
         "direction": "forward",
+        "security_claim": "3-round Feistel with PRF rounds is a PRP; 4 rounds is a strong PRP",
+    },
+    ("PRF", "CPA_ENC"): {
+        "steps": ["PRF → CPA-secure Enc (nonce-based: C = F_k(r) XOR m)"],
+        "theorem": "PRF → CPA Security",
+        "pa": "PA#3",
+        "direction": "forward",
+        "security_claim": "If adversary breaks IND-CPA with advantage ε in q queries, it breaks PRF with advantage ε' ≥ ε - q²/2^n",
     },
     ("PRF", "MAC"): {
         "steps": ["PRF → MAC (Mac_k(m) = F_k(m))"],
         "theorem": "PRF-MAC Security",
         "pa": "PA#5",
         "direction": "forward",
+        "security_claim": "If adversary forges MAC with probability ε in q queries, it distinguishes PRF with advantage ε' ≥ ε - q/2^n",
     },
     ("PRP", "MAC"): {
         "steps": ["PRP → PRF (switching lemma)", "PRF → MAC"],
         "theorem": "PRP/PRF Switching Lemma + PRF-MAC",
         "pa": "PA#5",
         "direction": "forward",
+        "security_claim": "PRP is indistinguishable from PRF with advantage ≤ q²/2^n+1; combined with PRF-MAC gives EUF-CMA",
+    },
+    ("CPA_ENC", "CCA_ENC"): {
+        "steps": ["CPA_Enc + MAC → CCA (Encrypt-then-MAC)"],
+        "theorem": "Encrypt-then-MAC → IND-CCA2",
+        "pa": "PA#6",
+        "direction": "forward",
+        "security_claim": "If Enc is IND-CPA and MAC is EUF-CMA, then Encrypt-then-MAC is IND-CCA2",
+    },
+    ("PRF", "CRHF"): {
+        "steps": ["PRF compression → Merkle-Damgård CRHF"],
+        "theorem": "Merkle-Damgård Collision Resistance",
+        "pa": "PA#7",
+        "direction": "forward",
+        "security_claim": "If compression function is collision-resistant, so is the MD hash",
+    },
+    ("DLP", "CRHF"): {
+        "steps": ["DLP → DLP hash (h(x,y)=g^x·h^y mod p is CRHF under DLP)"],
+        "theorem": "DLP-CRHF Reduction",
+        "pa": "PA#8",
+        "direction": "forward",
+        "security_claim": "Finding collision in DLP hash solves DLP: if h(x1,y1)=h(x2,y2) then alpha=(x1-x2)/(y2-y1) mod q",
     },
     ("CRHF", "HMAC"): {
         "steps": ["CRHF → HMAC (H built on PRF compression function)"],
         "theorem": "HMAC Security Theorem",
         "pa": "PA#10",
         "direction": "forward",
+        "security_claim": "HMAC is EUF-CMA if underlying hash is a PRF for secret key prefix",
     },
     ("HMAC", "MAC"): {
         "steps": ["HMAC → MAC (HMAC is EUF-CMA secure MAC)"],
         "theorem": "HMAC is a secure MAC",
         "pa": "PA#10",
         "direction": "forward",
+        "security_claim": "HMAC_k(m) is EUF-CMA secure under compression-function PRF assumption",
+    },
+    # ── Backward reductions ───────────────────────────────────────────────
+    ("PRG", "OWF"): {
+        "steps": ["PRG → OWF (any PRG is a OWF by hard-core predicate argument)"],
+        "theorem": "PRG implies OWF (contrapositive)",
+        "pa": "PA#1",
+        "direction": "backward",
+        "security_claim": "If no OWF exists, no PRG exists: inverting G on random output solves OWF",
+    },
+    ("PRF", "PRG"): {
+        "steps": ["PRF → PRG: G(s) = F_s(0^n) || F_s(1^n)"],
+        "theorem": "PRF implies PRG (length-doubling)",
+        "pa": "PA#2",
+        "direction": "backward",
+        "security_claim": "F_k is a PRF → G(k) = F_k(0)||F_k(1) is a secure PRG",
+    },
+    ("PRP", "PRF"): {
+        "steps": ["PRP → PRF (PRP is PRF on super-poly domain by switching lemma)"],
+        "theorem": "PRP/PRF Switching Lemma",
+        "pa": "PA#4",
+        "direction": "backward",
+        "security_claim": "PRP is indistinguishable from PRF with advantage ≤ q²/2^(n+1)",
+    },
+    ("MAC", "PRF"): {
+        "steps": ["MAC → PRF: secure EUF-CMA MAC on uniform messages is a PRF"],
+        "theorem": "MAC implies PRF (uniform-message domain)",
+        "pa": "PA#5",
+        "direction": "backward",
+        "security_claim": "A secure MAC on all-uniform messages implies PRF; contrapositive: PRF-breaker → MAC forger",
+    },
+    ("HMAC", "CRHF"): {
+        "steps": ["HMAC → CRHF: fix key k, H'(m) = HMAC_k(m) is collision-resistant"],
+        "theorem": "HMAC implies CRHF (fixed key)",
+        "pa": "PA#10",
+        "direction": "backward",
+        "security_claim": "If HMAC is EUF-CMA secure, then H'(m)=HMAC_k(m) is collision resistant for a random k",
+    },
+    ("MAC", "CRHF"): {
+        "steps": ["MAC compression function → Merkle-Damgård CRHF"],
+        "theorem": "MAC compression → CRHF",
+        "pa": "PA#10",
+        "direction": "backward",
+        "security_claim": "PRF-MAC's internal compression function is a CRHF",
+    },
+    ("MAC", "HMAC"): {
+        "steps": ["MAC → HMAC: any PRF-based MAC fits HMAC double-hash structure"],
+        "theorem": "PRF-MAC ≡ HMAC (for PRF compression functions)",
+        "pa": "PA#10",
+        "direction": "backward",
+        "security_claim": "HMAC generalizes PRF-MAC for arbitrary-length messages",
+    },
+    # ── Multi-hop paths ───────────────────────────────────────────────────
+    ("OWF", "PRF"): {
+        "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)"],
+        "theorem": "OWF → PRG → PRF (HILL + GGM)",
+        "pa": "PA#1, PA#2",
+        "direction": "forward",
+        "security_claim": "OWF is the minimal assumption for PRF existence",
+    },
+    ("OWF", "MAC"): {
+        "steps": ["OWF → PRG → PRF → MAC"],
+        "theorem": "OWF → MAC",
+        "pa": "PA#1, PA#2, PA#5",
+        "direction": "forward",
+        "security_claim": "MAC can be built from any OWF",
+    },
+    ("OWF", "PRP"): {
+        "steps": ["OWF → PRG → PRF → PRP (Luby-Rackoff)"],
+        "theorem": "OWF → PRP",
+        "pa": "PA#1, PA#2, PA#4",
+        "direction": "forward",
+        "security_claim": "Block ciphers (PRPs) exist if OWFs exist",
+    },
+    ("PRG", "MAC"): {
+        "steps": ["PRG → PRF (GGM)", "PRF → MAC"],
+        "theorem": "PRG → MAC",
+        "pa": "PA#2, PA#5",
+        "direction": "forward",
+        "security_claim": "PRG suffices for MAC construction",
+    },
+    ("PRG", "PRP"): {
+        "steps": ["PRG → PRF (GGM)", "PRF → PRP (Luby-Rackoff)"],
+        "theorem": "PRG → PRP",
+        "pa": "PA#2, PA#4",
+        "direction": "forward",
+        "security_claim": "PRG suffices for PRP (block cipher) construction",
+    },
+    ("OWP", "PRG"): {
+        "steps": ["OWP → OWF (any OWP is a OWF)", "OWF → PRG (HILL)"],
+        "theorem": "OWP → OWF → PRG",
+        "pa": "PA#1",
+        "direction": "forward",
+        "security_claim": "OWP is a special case of OWF",
+    },
+    ("OWP", "PRF"): {
+        "steps": ["OWP → OWF", "OWF → PRG (HILL)", "PRG → PRF (GGM)"],
+        "theorem": "OWP → PRF",
+        "pa": "PA#1, PA#2",
+        "direction": "forward",
+        "security_claim": "OWP implies PRF via HILL construction",
+    },
+    ("CRHF", "MAC"): {
+        "steps": ["CRHF → HMAC (compression function)", "HMAC → MAC (EUF-CMA)"],
+        "theorem": "CRHF → MAC",
+        "pa": "PA#10",
+        "direction": "forward",
+        "security_claim": "HMAC builds a secure MAC from any CRHF",
     },
 }
+
+@app.get("/api/reduce/all")
+def reduce_all():
+    """Return the full routing table as JSON."""
+    result = []
+    for (src, tgt), entry in ROUTING_TABLE.items():
+        result.append({
+            "source": src,
+            "target": tgt,
+            **entry,
+        })
+    return {"reductions": result, "count": len(result)}
 
 @app.post("/api/reduce")
 def reduce_query(req: ReduceRequest):
@@ -846,9 +1002,31 @@ def reduce_query(req: ReduceRequest):
         entry["direction"] = "backward"
         entry["note"] = f"Backward reduction: {req.target} ⇒ {req.source}"
         return entry
+    # Try multi-hop BFS
+    graph = {}
+    for (s, t) in ROUTING_TABLE:
+        graph.setdefault(s, []).append(t)
+    src, tgt = req.source.upper(), req.target.upper()
+    from collections import deque
+    q = deque([(src, [src])])
+    visited = {src}
+    while q:
+        node, path = q.popleft()
+        if node == tgt:
+            steps = []
+            for i in range(len(path) - 1):
+                k = (path[i], path[i+1])
+                if k in ROUTING_TABLE:
+                    steps.extend(ROUTING_TABLE[k]["steps"])
+            return {"source": src, "target": tgt, "path": path, "steps": steps,
+                    "direction": "multi-hop", "supported": True}
+        for nxt in graph.get(node, []):
+            if nxt not in visited:
+                visited.add(nxt)
+                q.append((nxt, path + [nxt]))
     return {
-        "steps": [f"No direct path from {req.source} to {req.target}"],
-        "note": "Try using the bidirectional toggle or an intermediate primitive",
+        "steps": [f"No path from {req.source} to {req.target}"],
+        "note": "Try using an intermediate primitive",
         "supported": False,
     }
 

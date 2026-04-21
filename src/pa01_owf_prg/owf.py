@@ -28,29 +28,47 @@ _TOY_SAFE_PRIME = (
     7,                     # g  (generator of order q subgroup)
 )
 
-def _is_prime_trial(n: int, limit: int = 10000) -> bool:
+def _is_prime_miller_rabin(n: int, k: int = 20) -> bool:
+    """Miller-Rabin primality test (no external deps)."""
     if n < 2: return False
-    if n == 2: return True
+    if n in (2, 3): return True
     if n % 2 == 0: return False
-    i = 3
-    while i * i <= n and i <= limit:
-        if n % i == 0: return False
-        i += 2
+    s, d = 0, n - 1
+    while d % 2 == 0:
+        s += 1
+        d //= 2
+    nbytes = max(1, (n.bit_length() + 7) // 8)
+    for _ in range(k):
+        a = int.from_bytes(os.urandom(nbytes), 'big') % (n - 3) + 2
+        x = pow(a, d, n)
+        if x == 1 or x == n - 1:
+            continue
+        for _ in range(s - 1):
+            x = pow(x, 2, n)
+            if x == n - 1:
+                break
+        else:
+            return False
     return True
 
 def _gen_safe_prime(bits: int = 32) -> tuple:
-    """Generate a safe prime p=2q+1 with q prime (toy size for speed)."""
-    import random as _rand
-    rng = _rand.Random(42)
+    """Generate a safe prime p=2q+1 with q prime."""
+    nbytes = max(1, (bits - 1 + 7) // 8)
     while True:
-        q = rng.getrandbits(bits - 1) | (1 << (bits - 2)) | 1
-        if _is_prime_trial(q):
-            p = 2 * q + 1
-            if _is_prime_trial(p):
-                # Find generator of subgroup of order q
-                for g in range(2, p):
-                    if pow(g, q, p) == 1 and pow(g, 2, p) != 1:
-                        return p, q, g
+        q = int.from_bytes(os.urandom(nbytes), 'big')
+        q |= (1 << (bits - 2))  # ensure high bit set
+        q |= 1                   # ensure odd
+        q &= (1 << (bits - 1)) - 1  # clamp to bits-1 bits
+        q |= (1 << (bits - 2))   # re-set high bit after mask
+        if not _is_prime_miller_rabin(q):
+            continue
+        p = 2 * q + 1
+        if not _is_prime_miller_rabin(p):
+            continue
+        # Find generator of prime-order subgroup
+        for g in range(2, min(p, 1000)):
+            if pow(g, q, p) == 1 and pow(g, 2, p) != 1:
+                return p, q, g
 
 
 class DLPOWF:
@@ -72,15 +90,20 @@ class DLPOWF:
         """Compute g^x mod p."""
         return pow(self.g, x % self.q, self.p)
 
-    def verify_hardness(self) -> str:
-        return (
-            f"DLP OWF: f(x) = g^x mod p\n"
-            f"  p = {self.p} ({self.p.bit_length()} bits)\n"
-            f"  q = {self.q} (group order)\n"
-            f"  g = {self.g} (generator)\n"
-            "Hardness: computing x from g^x mod p requires solving DLP\n"
-            "Best known algorithm: Baby-step Giant-step O(sqrt(q))"
-        )
+    def verify_hardness(self, x: int = None) -> dict:
+        result = {
+            "hardness": "DLP",
+            "description": "f(x) = g^x mod p",
+            "p": self.p,
+            "q": self.q,
+            "g": self.g,
+            "bits": self.bits,
+            "best_attack": "Baby-step Giant-step O(sqrt(q))",
+        }
+        if x is not None:
+            result["input"] = x
+            result["output"] = self.evaluate(x)
+        return result
 
     def group_params(self) -> dict:
         return {"p": self.p, "q": self.q, "g": self.g, "bits": self.bits}

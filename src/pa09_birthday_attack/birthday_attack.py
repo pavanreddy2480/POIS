@@ -21,8 +21,10 @@ def birthday_attack_naive(hash_fn, n_bits: int, num_trials: int = None) -> dict:
     mask = (1 << n_bits) - 1
     start = time.time()
 
+    # Use enough bytes to ensure >> 2^(n/2) distinct inputs are possible
+    input_bytes = max(2, (n_bits + 3) // 4)
     for i in range(num_trials):
-        x = os.urandom(max(1, n_bits // 8))
+        x = os.urandom(input_bytes)
         h = hash_fn(x) & mask
         if h in seen and seen[h] != x:
             elapsed = time.time() - start
@@ -41,55 +43,85 @@ def birthday_attack_naive(hash_fn, n_bits: int, num_trials: int = None) -> dict:
     return {"found": False, "evaluations": num_trials}
 
 
-def birthday_attack_floyd(hash_fn, n_bits: int) -> dict:
+def birthday_attack_floyd(hash_fn, n_bits: int, max_retries: int = 30) -> dict:
     """
     Floyd's cycle detection (tortoise & hare) collision finder.
-    Space-efficient: O(1) memory.
+    Space-efficient: O(sqrt(N)) time, O(1) memory.
+
+    Collision comes from the rho structure: the tail element x_{mu-1} and the
+    element x_{mu+lam-1} at the end of the cycle are both predecessors of
+    cycle_start, so f(x_{mu-1}) == f(x_{mu+lam-1}) with x_{mu-1} != x_{mu+lam-1}.
+    Retries if starting point lands directly in the cycle (mu=0).
     """
     mask = (1 << n_bits) - 1
+    total_evals = 0
+
+    n_bytes = max(1, (n_bits + 7) // 8)
 
     def f(x: int) -> int:
-        b = x.to_bytes(max(1, (x.bit_length() + 7) // 8) or 1, 'big')
+        b = (x & mask).to_bytes(n_bytes, 'big')
         return hash_fn(b) & mask
 
-    # Phase 1: find meeting point
-    x_seed = int.from_bytes(os.urandom(max(1, n_bits // 8)), 'big') & mask
-    tortoise = f(x_seed)
-    hare = f(f(x_seed))
-    evals = 3
+    for _ in range(max_retries):
+        x0 = int.from_bytes(os.urandom(max(1, n_bits // 8)), 'big') & mask
 
-    while tortoise != hare:
-        tortoise = f(tortoise)
-        hare = f(f(hare))
-        evals += 3
+        # Phase 1: find meeting point
+        tortoise = f(x0)
+        hare = f(f(x0))
+        evals = 3
+        while tortoise != hare:
+            tortoise = f(tortoise)
+            hare = f(f(hare))
+            evals += 3
 
-    # Phase 2: find cycle start
-    tortoise = x_seed
-    while tortoise != hare:
-        tortoise = f(tortoise)
-        hare = f(hare)
-        evals += 2
+        # Phase 2: find mu (tail length) — reset tortoise to x0
+        mu = 0
+        tortoise = x0
+        while tortoise != hare:
+            tortoise = f(tortoise)
+            hare = f(hare)
+            evals += 2
+            mu += 1
 
-    cycle_start = tortoise
+        total_evals += evals
 
-    # Phase 3: find second preimage
-    tortoise = f(cycle_start)
-    evals += 1
-    while f(tortoise) != f(cycle_start) or tortoise == cycle_start:
-        tortoise = f(tortoise)
-        evals += 1
+        # Need mu > 0 for the tail collision to exist; retry otherwise
+        if mu == 0:
+            continue
 
-    h1 = f(cycle_start) & mask
-    h2 = f(tortoise) & mask
-    if h1 == h2 and cycle_start != tortoise:
-        return {
-            "found": True,
-            "x1": hex(cycle_start),
-            "x2": hex(tortoise),
-            "hash": hex(h1),
-            "evaluations": evals,
-        }
-    return {"found": False, "evaluations": evals}
+        # Phase 3: find lambda (cycle length)
+        lam = 1
+        hare = f(tortoise)  # tortoise == cycle_start
+        total_evals += 1
+        while hare != tortoise:
+            hare = f(hare)
+            total_evals += 1
+            lam += 1
+
+        # Collision: x_{mu-1} and x_{mu+lam-1} are both predecessors of cycle_start
+        a = x0
+        for _ in range(mu - 1):
+            a = f(a)
+            total_evals += 1
+        b = x0
+        for _ in range(mu + lam - 1):
+            b = f(b)
+            total_evals += 1
+
+        ha = f(a) & mask
+        hb = f(b) & mask
+        total_evals += 2
+
+        if a != b and ha == hb:
+            return {
+                "found": True,
+                "x1": hex(a),
+                "x2": hex(b),
+                "hash": hex(ha),
+                "evaluations": total_evals,
+            }
+
+    return {"found": False, "evaluations": total_evals}
 
 
 def run_birthday_empirical(hash_fn, n_values, trials_per_n=20):

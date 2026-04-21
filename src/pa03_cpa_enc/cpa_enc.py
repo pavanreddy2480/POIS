@@ -74,16 +74,15 @@ class CPAEnc:
         Simulate IND-CPA security game.
         Returns statistics showing the scheme is secure (advantage ~0).
         """
-        import random as _rand
         correct = 0
         for _ in range(num_rounds):
             m0 = os.urandom(BLOCK_SIZE)
             m1 = os.urandom(BLOCK_SIZE)
-            b  = _rand.randint(0, 1)
+            b  = int.from_bytes(os.urandom(1), 'big') % 2
             m_challenge = m0 if b == 0 else m1
             r, c = self.enc(k, m_challenge)
-            # Adversary strategy: always guess b=0 (or random)
-            b_guess = _rand.randint(0, 1)
+            # Adversary strategy: random guess (can't do better)
+            b_guess = int.from_bytes(os.urandom(1), 'big') % 2
             if b_guess == b:
                 correct += 1
         advantage = abs(correct / num_rounds - 0.5)

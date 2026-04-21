@@ -14,7 +14,8 @@
   --text-muted: #5c6bc0;
   --border: #2d3561;
   --border-light: #3d4a7a;
-  --font-mono: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --radius: 8px;
   --shadow: 0 4px 24px rgba(0,0,0,0.4);
 }
@@ -24,7 +25,7 @@
 body {
   background: var(--bg-primary);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.6;
 }
 
@@ -574,8 +575,21 @@ input[type="range"]::-webkit-slider-thumb {
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .top-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+  }
+  .top-bar h1 { width: 100%; }
+  .direction-toggle { margin-left: 0; }
+}
+
 @media (max-width: 768px) {
   .two-column { grid-template-columns: 1fr; }
   .demo-row { grid-template-columns: 1fr; }
   .top-bar h1 { font-size: 0.85rem; }
+  .demo-tab-bar { gap: 4px; }
+  .demo-tab { padding: 6px 10px; font-size: 0.72rem; }
+  .column-panel { padding: 14px; }
 }

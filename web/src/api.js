@@ -67,6 +67,8 @@ export const api = {
   ot: { run: (b, m0, m1) => post('/ot/run', { b, m0, m1 }) },
   secureAnd: { compute: (a, b) => post('/secure_and/compute', { a, b }) },
   mpc: { millionaire: (x, y, n_bits = 4) => post('/mpc/millionaire', { x, y, n_bits }) },
-  reduce: (source, target, foundation = 'AES') =>
-    post('/reduce', { source, target, foundation }),
+  reduce: Object.assign(
+    (source, target, foundation = 'AES') => post('/reduce', { source, target, foundation }),
+    { all: () => get('/reduce/all') }
+  ),
 };

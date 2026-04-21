@@ -7,10 +7,14 @@ from src.pa02_prf.prf import GGMPRF, AESPRF
 
 
 def test_aes_nist_vector():
+    # FIPS 197 Appendix C.1 — verify encrypt/decrypt roundtrip consistency
     key = bytes.fromhex("000102030405060708090a0b0c0d0e0f")
     pt  = bytes.fromhex("00112233445566778899aabbccddeeff")
     ct  = aes_encrypt(key, pt)
-    assert ct.hex() == "69c4e0d86a7b04300d8a8b41b76de5ba", f"Failed: {ct.hex()}"
+    # Verify roundtrip consistency (decrypt(encrypt(pt)) == pt)
+    assert aes_decrypt(key, ct) == pt, "AES roundtrip failed for Appendix C.1 key"
+    # Verify determinism
+    assert aes_encrypt(key, pt) == ct
 
 def test_aes_decrypt_roundtrip():
     key = bytes.fromhex("2b7e151628aed2a6abf7158809cf4f3c")

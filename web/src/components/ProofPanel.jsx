@@ -1,81 +1,212 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
-const REDUCTIONS = {
-  'OWF_PRG': {
-    steps: [
-      { from: 'OWF', to: 'PRG', theorem: 'HILL Theorem', security: 'If f is OWF with hard-core predicate b, G(x₀)=b(x₀)‖b(x₁)‖… is secure PRG' }
-    ]
-  },
-  'PRG_PRF': {
-    steps: [
-      { from: 'PRG', to: 'PRF', theorem: 'GGM Theorem', security: 'If G is a secure PRG, then F_k via GGM tree is a secure PRF (advantage ≤ n·negl)' }
-    ]
-  },
-  'PRF_PRP': {
-    steps: [
-      { from: 'PRF', to: 'PRP', theorem: 'Luby-Rackoff', security: '3-round Feistel with PRF round function yields secure PRP; 4-round yields strong PRP' }
-    ]
-  },
-  'PRF_MAC': {
-    steps: [
-      { from: 'PRF', to: 'MAC', theorem: 'PRF-MAC Security', security: 'Mac_k(m)=F_k(m) is EUF-CMA secure if F is a secure PRF' }
-    ]
-  },
+function FlowDot({ active }) {
+  const [pos, setPos] = useState(0);
+  const raf = useRef(null);
+  const start = useRef(null);
+
+  useEffect(() => {
+    if (!active) { setPos(0); return; }
+    const animate = (ts) => {
+      if (!start.current) start.current = ts;
+      const p = ((ts - start.current) % 1800) / 1800;
+      setPos(p);
+      raf.current = requestAnimationFrame(animate);
+    };
+    raf.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(raf.current);
+  }, [active]);
+
+  return (
+    <div style={{
+      position: 'absolute',
+      left: `calc(${pos * 100}% - 5px)`,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 10, height: 10, borderRadius: '50%',
+      background: 'var(--accent-blue)',
+      boxShadow: '0 0 8px 3px rgba(74,158,255,0.7)',
+      pointerEvents: 'none',
+      transition: 'left 0.05s linear',
+    }} />
+  );
+}
+
+function PrimitivePill({ label, highlight, isLeaf }) {
+  return (
+    <div style={{
+      padding: '6px 14px',
+      borderRadius: 20,
+      border: `1.5px solid ${highlight ? 'var(--accent-blue)' : isLeaf ? 'var(--accent-green)' : 'var(--border)'}`,
+      background: highlight
+        ? 'rgba(74,158,255,0.15)'
+        : isLeaf
+          ? 'rgba(46,204,113,0.12)'
+          : 'var(--bg-primary)',
+      color: highlight ? 'var(--accent-blue)' : isLeaf ? 'var(--accent-green)' : 'var(--text-primary)',
+      fontFamily: 'var(--font-mono)',
+      fontSize: '0.82rem',
+      fontWeight: 600,
+      whiteSpace: 'nowrap',
+      flexShrink: 0,
+    }}>
+      {label}
+    </div>
+  );
+}
+
+function Arrow({ theorem, security, active, dim }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      flex: '1 1 80px', minWidth: 60, maxWidth: 180,
+      opacity: dim ? 0.4 : 1,
+      transition: 'opacity 0.3s',
+    }}>
+      <div style={{
+        fontSize: '0.65rem', color: 'var(--accent-gold)',
+        fontFamily: 'var(--font-mono)', marginBottom: 2,
+        textAlign: 'center', maxWidth: 120,
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }} title={theorem}>
+        {theorem}
+      </div>
+      <div style={{ position: 'relative', width: '100%', height: 20 }}>
+        <svg width="100%" height="20" style={{ overflow: 'visible' }}>
+          <defs>
+            <marker id={`arrowhead-${active ? 'a' : 'i'}`} markerWidth="6" markerHeight="4"
+              refX="6" refY="2" orient="auto">
+              <polygon points="0 0, 6 2, 0 4"
+                fill={active ? 'var(--accent-blue)' : 'var(--border)'} />
+            </marker>
+          </defs>
+          <line x1="0" y1="10" x2="100%" y2="10"
+            stroke={active ? 'var(--accent-blue)' : 'var(--border)'}
+            strokeWidth={active ? 2 : 1}
+            markerEnd={`url(#arrowhead-${active ? 'a' : 'i'})`}
+          />
+        </svg>
+        <FlowDot active={active} />
+      </div>
+      <div style={{
+        fontSize: '0.6rem', color: 'var(--text-muted)',
+        textAlign: 'center', maxWidth: 120, marginTop: 2,
+        overflow: 'hidden', display: '-webkit-box',
+        WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+      }} title={security}>
+        {security}
+      </div>
+    </div>
+  );
+}
+
+function FlowDiagram({ nodes, activeSource, activeTarget }) {
+  if (!nodes || nodes.length === 0) return null;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', overflowX: 'auto',
+      padding: '16px 8px', gap: 0,
+    }}>
+      {nodes.map((n, i) => {
+        const isLast = i === nodes.length - 1;
+        const isFirst = i === 0;
+        const isActive = n.primitive === activeSource || n.primitive === activeTarget;
+        const isLeaf = isLast && !isFirst;
+        return (
+          <React.Fragment key={i}>
+            <PrimitivePill label={n.primitive} highlight={isActive} isLeaf={isLeaf && !isActive} />
+            {!isLast && (
+              <Arrow
+                theorem={nodes[i + 1].theorem}
+                security={nodes[i + 1].security}
+                active={isActive || nodes[i + 1].primitive === activeSource || nodes[i + 1].primitive === activeTarget}
+                dim={false}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+const FOUNDATION_BUILDS = {
+  AES: { PRF: 'AES is PRF', PRP: 'AES is PRP', PRG: 'AES PRG (CTR)', MAC: 'PRF-MAC', CRHF: 'MD+PRF', HMAC: 'HMAC-SHA' },
+  DLP: { OWF: 'DLP OWF', PRG: 'HILL PRG', OWP: 'DLP OWP' },
 };
 
 export default function ProofPanel({ open, setOpen, foundation, source, target, direction, proofChain, routeInfo }) {
-  const key = `${source}_${target}`;
-  const info = REDUCTIONS[key] || null;
+  // Build the chain: [foundation] → [source] → [target]
+  // Each node carries the label on the INCOMING arrow (theorem + security claim)
+  const foundationSecurity = foundation === 'AES'
+    ? 'AES is a concrete PRP/PRF (NIST standard)'
+    : 'DLP: g^x mod p is OWF/OWP under Discrete Log hardness';
+
+  const nodes = [{ primitive: foundation, theorem: '', security: '' }];
+
+  if (source && source !== foundation) {
+    const th = FOUNDATION_BUILDS[foundation]?.[source] || `${foundation}→${source}`;
+    nodes.push({ primitive: source, theorem: th, security: foundationSecurity });
+  }
+
+  if (target && target !== source && target !== foundation) {
+    nodes.push({
+      primitive: target,
+      theorem: routeInfo?.theorem || `${source}→${target}`,
+      security: routeInfo?.security_claim || '',
+    });
+  }
+
+  // Multi-hop: if routeInfo has a path with intermediate nodes
+  // routeInfo.path is sometimes present for multi-hop reductions
+  const deduped = nodes.filter((n, i) => i === 0 || n.primitive !== nodes[i - 1].primitive);
 
   return (
     <div className="proof-panel">
-      <div className="proof-header" onClick={() => setOpen(o => !o)}>
-        <span style={{ color: 'var(--text-muted)' }}>{open ? '▼' : '▶'}</span>
-        <h3>Reduction Proof Summary</h3>
-        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 8 }}>
-          {foundation} → {source} → {target} {direction === 'backward' ? '(backward)' : ''}
+      <div className="proof-header" onClick={() => setOpen(o => !o)} style={{ cursor: 'pointer' }}>
+        <span style={{ color: 'var(--text-muted)', marginRight: 8 }}>{open ? '▼' : '▶'}</span>
+        <h3 style={{ margin: 0, display: 'inline' }}>Reduction Proof</h3>
+        <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 12 }}>
+          {foundation} → {source}{target && target !== source ? ` → ${target}` : ''}
+          {direction === 'backward' ? ' (backward)' : ''}
         </span>
+        {routeInfo?.theorem && (
+          <span className="badge badge-secure" style={{ marginLeft: 10 }}>
+            {routeInfo.theorem}
+          </span>
+        )}
         <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-          click to {open ? 'collapse' : 'expand'}
+          {open ? 'collapse' : 'expand'}
         </span>
       </div>
 
       {open && (
         <div className="proof-body">
-          <div className="proof-chain-step">
-            <span className="proof-primitive">{foundation}</span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>→</span>
-            <div>
-              <div className="proof-theorem">Foundation Layer</div>
-              <div className="proof-security">
-                {foundation === 'AES' ? 'AES is a concrete PRP/PRF (NIST standard). Security assumed from cryptanalysis.' : 'DLP: g^x mod p is a OWF/OWP under Discrete Log hardness assumption.'}
-              </div>
-            </div>
-          </div>
+          <FlowDiagram
+            nodes={deduped}
+            activeSource={source}
+            activeTarget={target}
+          />
 
-          {info ? info.steps.map((s, i) => (
-            <div className="proof-chain-step" key={i}>
-              <span className="proof-primitive">{s.from} → {s.to}</span>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>⊢</span>
-              <div>
-                <div className="proof-theorem">{s.theorem}</div>
-                <div className="proof-security">{s.security}</div>
-              </div>
-            </div>
-          )) : (
-            <div className="proof-chain-step">
-              <span className="proof-primitive">{source} → {target}</span>
-              <div>
-                <div className="proof-theorem">{routeInfo?.theorem || 'Reduction'}</div>
-                <div className="proof-security">
-                  {routeInfo?.steps?.[0] || `See the assignment spec for ${source} → ${target} reduction details.`}
-                </div>
-              </div>
+          {routeInfo?.security_claim && (
+            <div style={{
+              marginTop: 8, padding: '10px 14px',
+              background: 'rgba(74,158,255,0.07)',
+              border: '1px solid rgba(74,158,255,0.2)',
+              borderRadius: 6, fontSize: '0.76rem',
+              color: 'var(--text-secondary)', lineHeight: 1.5,
+            }}>
+              <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>Security claim: </span>
+              {routeInfo.security_claim}
             </div>
           )}
 
-          <div style={{ marginTop: 14, padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: 6, fontSize: '0.74rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-            All intermediate values shown above are real outputs from your PA#1–#10 implementations.
+          <div style={{
+            marginTop: 10, fontSize: '0.72rem',
+            color: 'var(--text-muted)', fontStyle: 'italic',
+          }}>
+            All values computed live from your PA#1–#20 implementations.
           </div>
         </div>
       )}
