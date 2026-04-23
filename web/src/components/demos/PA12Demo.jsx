@@ -41,7 +41,7 @@ export default function PA12Demo() {
           <input type="checkbox" checked={pkcs} onChange={e => setPkcs(e.target.checked)} />
           Use PKCS#1 v1.5 padding (randomized)
         </label>
-        <button className="btn-primary" onClick={run} disabled={loading}>
+        <button className="btn btn-primary" onClick={run} disabled={loading}>
           {loading ? 'Computing…' : 'Encrypt × 2'}
         </button>
         {result && !result.error && (

@@ -40,7 +40,7 @@ export default function PA19Demo() {
             </label>
             <div style={{ display: 'flex', gap: 6 }}>
               {[0, 1].map(v => (
-                <button key={v} className={`btn-${a === v ? 'primary' : 'secondary'}`}
+                <button key={v} className={`btn btn-${a === v ? 'primary' : 'secondary'}`}
                   style={{ padding: '4px 16px' }} onClick={() => { setA(v); setResult(null); }}>
                   {v}
                 </button>
@@ -53,7 +53,7 @@ export default function PA19Demo() {
             </label>
             <div style={{ display: 'flex', gap: 6 }}>
               {[0, 1].map(v => (
-                <button key={v} className={`btn-${b === v ? 'primary' : 'secondary'}`}
+                <button key={v} className={`btn btn-${b === v ? 'primary' : 'secondary'}`}
                   style={{ padding: '4px 16px' }} onClick={() => { setB(v); setResult(null); }}>
                   {v}
                 </button>
@@ -70,10 +70,10 @@ export default function PA19Demo() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-          <button className="btn-primary" onClick={run} disabled={loading}>
+          <button className="btn btn-primary" onClick={run} disabled={loading}>
             {loading ? 'Running OT…' : 'Compute Secure AND'}
           </button>
-          <button className="btn-secondary" onClick={() => setShowTable(!showTable)}>
+          <button className="btn btn-secondary" onClick={() => setShowTable(!showTable)}>
             {showTable ? 'Hide' : 'Show'} Truth Table
           </button>
         </div>

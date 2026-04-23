@@ -40,7 +40,7 @@ export default function PA17Demo() {
           <input type="checkbox" checked={tamper} onChange={e => setTamper(e.target.checked)} />
           Tamper ciphertext (simulate chosen-ciphertext attack)
         </label>
-        <button className="btn-primary" onClick={run} disabled={loading}>
+        <button className="btn btn-primary" onClick={run} disabled={loading}>
           {loading ? 'Working…' : 'Encrypt & Decrypt'}
         </button>
 

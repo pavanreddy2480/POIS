@@ -277,6 +277,7 @@ html, body, #root {
   flex-shrink: 0;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 12px 8px;
   display: flex;
@@ -284,10 +285,86 @@ html, body, #root {
   gap: 2px;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+  transition: width 0.22s ease, padding 0.22s ease;
 }
 
 .demo-nav::-webkit-scrollbar { width: 3px; }
 .demo-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Collapsed sidebar ───────────────────────────────────────── */
+.demo-nav.collapsed {
+  width: 48px;
+  padding: 12px 4px;
+  overflow-y: hidden;
+}
+
+/* Hover-to-peek: temporarily reveal full sidebar without locking it open */
+.demo-nav.collapsed:hover {
+  width: 220px;
+  padding: 12px 8px;
+  overflow-y: auto;
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .demo-nav.collapsed:hover {
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Items: show only the num badge when collapsed */
+.demo-nav.collapsed .demo-nav-item {
+  padding: 7px 6px;
+}
+.demo-nav.collapsed:hover .demo-nav-item {
+  padding: 7px 10px;
+}
+
+/* Labels / title / divider fade out instantly on collapse,
+   fade back in after the width finishes expanding on hover  */
+.demo-nav.collapsed .demo-nav-label,
+.demo-nav.collapsed .demo-nav-tag,
+.demo-nav.collapsed .demo-nav-title,
+.demo-nav.collapsed .demo-nav-divider {
+  opacity: 0;
+  transition: none;
+}
+.demo-nav.collapsed:hover .demo-nav-label,
+.demo-nav.collapsed:hover .demo-nav-tag,
+.demo-nav.collapsed:hover .demo-nav-title,
+.demo-nav.collapsed:hover .demo-nav-divider {
+  opacity: 1;
+  transition: opacity 0.12s ease 0.16s;
+}
+
+/* ── Sidebar toggle button ───────────────────────────────────── */
+.demo-nav-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 2px 8px;
+  flex-shrink: 0;
+}
+
+.demo-nav-toggle-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-well);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.demo-nav-toggle-btn:hover {
+  background: var(--accent-blue-bg);
+  color: var(--accent-blue);
+  border-color: rgba(79, 108, 247, 0.3);
+}
 
 .demo-nav-title {
   font-size: 0.65rem;

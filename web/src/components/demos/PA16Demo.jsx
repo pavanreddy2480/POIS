@@ -44,7 +44,7 @@ export default function PA16Demo() {
             <input className="hex-input" value={multiplier} onChange={e => setMultiplier(e.target.value)} style={{ width: '100%' }} />
           </div>
         </div>
-        <button className="btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 16 }}>
+        <button className="btn btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 16 }}>
           {loading ? 'Running…' : 'Encrypt & Attack'}
         </button>
 

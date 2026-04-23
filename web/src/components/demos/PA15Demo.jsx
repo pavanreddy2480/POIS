@@ -51,7 +51,7 @@ export default function PA15Demo() {
             Show multiplicative forgery
           </label>
         </div>
-        <button className="btn-primary" onClick={run} disabled={loading}>
+        <button className="btn btn-primary" onClick={run} disabled={loading}>
           {loading ? 'Working…' : 'Sign & Verify'}
         </button>
 

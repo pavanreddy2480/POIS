@@ -38,13 +38,13 @@ export default function PA14Demo() {
         />
         <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
           {['7', '42', '99', '255'].map(v => (
-            <button key={v} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '3px 10px' }}
+            <button key={v} className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '3px 10px' }}
               onClick={() => { setM(v); setResult(null); }}>
               {v}
             </button>
           ))}
         </div>
-        <button className="btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 16 }}>
+        <button className="btn btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 16 }}>
           {loading ? 'Attacking…' : 'Run Håstad Attack'}
         </button>
 

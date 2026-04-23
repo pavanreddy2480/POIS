@@ -53,19 +53,36 @@ export default function DemoSection({
   proofOpen, setProofOpen, direction, proofChain, onRun,
 }) {
   const [active, setActive] = useState('home');
+  const [navOpen, setNavOpen] = useState(true);
   const demo = DEMOS.find(d => d.id === active);
 
   return (
     <div className="demo-layout">
       {/* Arc-style left nav */}
-      <nav className="demo-nav">
+      <nav className={`demo-nav${navOpen ? '' : ' collapsed'}`}>
+        {/* Collapse / expand toggle */}
+        <div className="demo-nav-toggle">
+          <button
+            className="demo-nav-toggle-btn"
+            onClick={() => setNavOpen(o => !o)}
+            title={navOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          >
+            {navOpen ? '‹' : '›'}
+          </button>
+        </div>
+
         {/* Home */}
         <div className="demo-nav-title">Explorer</div>
         <button
           className={`demo-nav-item${active === 'home' ? ' active' : ''}`}
           onClick={() => setActive('home')}
         >
-          <span className="demo-nav-num">⌂</span>
+          <span className="demo-nav-num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M11.47 3.841a.75.75 0 0 1 1.06 0l8.69 8.69a.75.75 0 1 0 1.06-1.061l-8.69-8.69a2.25 2.25 0 0 0-3.18 0l-8.69 8.69a.75.75 0 1 0 1.06 1.06l8.69-8.69Z" />
+              <path d="M12 5.432 3.841 13.59A1.875 1.875 0 0 0 3.75 14.5V20.25c0 .414.336.75.75.75H9a.75.75 0 0 0 .75-.75v-4.5a.75.75 0 0 1 .75-.75h3a.75.75 0 0 1 .75.75v4.5c0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75V14.5a1.875 1.875 0 0 0-.091-.91L12 5.432Z" />
+            </svg>
+          </span>
           <span className="demo-nav-label">Reduction Explorer</span>
           <span className="demo-nav-tag">HOME</span>
         </button>

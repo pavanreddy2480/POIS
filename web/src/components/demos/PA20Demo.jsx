@@ -41,7 +41,7 @@ export default function PA20Demo() {
         <div style={{ marginBottom: 8 }}>
           <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Bit width:</label>
           {[2, 3, 4].map(n => (
-            <button key={n} className={`btn-${nBits === n ? 'primary' : 'secondary'}`}
+            <button key={n} className={`btn btn-${nBits === n ? 'primary' : 'secondary'}`}
               style={{ marginLeft: 8, padding: '2px 10px', fontSize: '0.8rem' }}
               onClick={() => { setNBits(n); setResult(null); }}>
               {n}-bit (0–{Math.pow(2, n) - 1})
@@ -88,7 +88,7 @@ export default function PA20Demo() {
           </div>
         </div>
 
-        <button className="btn-primary" onClick={run} disabled={loading}>
+        <button className="btn btn-primary" onClick={run} disabled={loading}>
           {loading ? 'Evaluating Circuit…' : 'Run Secure Comparison'}
         </button>
 

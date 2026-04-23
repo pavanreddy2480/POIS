@@ -56,13 +56,13 @@ export default function PA18Demo() {
         <div style={{ display: 'flex', gap: 16, marginBottom: 12, alignItems: 'center' }}>
           <span style={{ fontSize: '0.85rem' }}>Receiver's choice bit b:</span>
           {[0, 1].map(v => (
-            <button key={v} className={`btn-${b === v ? 'primary' : 'secondary'}`}
+            <button key={v} className={`btn btn-${b === v ? 'primary' : 'secondary'}`}
               style={{ padding: '4px 20px' }} onClick={() => { setB(v); setResult(null); }}>
               b = {v}
             </button>
           ))}
         </div>
-        <button className="btn-primary" onClick={run} disabled={loading}>
+        <button className="btn btn-primary" onClick={run} disabled={loading}>
           {loading ? 'Running OT…' : 'Run OT Protocol'}
         </button>
 

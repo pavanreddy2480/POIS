@@ -63,16 +63,16 @@ export default function PA13Demo() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
-          <button className="btn-primary" onClick={run} disabled={loading}>
+          <button className="btn btn-primary" onClick={run} disabled={loading}>
             {loading ? 'Testing…' : 'Test Primality'}
           </button>
-          <button className="btn-secondary" onClick={genPrime} disabled={loading}>
+          <button className="btn btn-secondary" onClick={genPrime} disabled={loading}>
             Gen 32-bit Prime
           </button>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
           {[['561 (Carmichael)', '561'], ['1105', '1105'], ['1009 (prime)', '1009'], ['7919 (prime)', '7919']].map(([label, val]) => (
-            <button key={val} className="btn-secondary" style={{ fontSize: '0.75rem', padding: '3px 8px' }}
+            <button key={val} className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '3px 8px' }}
               onClick={() => { setN(val); setResult(null); }}>
               {label}
             </button>
