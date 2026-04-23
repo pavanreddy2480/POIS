@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import DemoHeader from '../DemoHeader';
 
 export default function PA9Demo() {
   const [n, setN] = useState(12);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const reset = () => { setN(12); setResult(null); };
 
   const run = async () => {
     setLoading(true);
@@ -21,7 +24,7 @@ export default function PA9Demo() {
   return (
     <div>
       <div className="demo-card">
-        <h4>🎂 PA#9 — Live Birthday Attack</h4>
+        <DemoHeader num={9} title="Live Birthday Attack" tag="CRHF" onReset={reset} />
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 14 }}>
           Hash n-bit outputs. Expected collision at O(2^(n/2)) evaluations. The birthday bound is information-theoretically tight.
         </p>
@@ -33,7 +36,7 @@ export default function PA9Demo() {
           </div>
         </div>
         <button className="btn btn-primary" onClick={run} disabled={loading}>
-          {loading ? '🔍 Running Attack...' : '▶ Run Birthday Attack'}
+          {loading ? 'Running Attack...' : '▶ Run Birthday Attack'}
         </button>
         {result && !result.error && (
           <div className="result-box" style={{ marginTop: 14 }}>
@@ -56,7 +59,7 @@ export default function PA9Demo() {
         {result?.error && <div className="hex-display red">{result.error}</div>}
       </div>
       <div className="demo-card">
-        <h4>📊 MD5/SHA-1 Context</h4>
+        <h4>MD5/SHA-1 Context</h4>
         <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 2 }}>
           <div>MD5 (n=128): needs ~2^64 ops → broken in 2005</div>
           <div>SHA-1 (n=160): needs ~2^80 ops → broken in 2017</div>

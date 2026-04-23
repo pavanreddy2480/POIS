@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import HexInput from '../HexInput';
+import DemoHeader from '../DemoHeader';
 
 const KE = '0123456789abcdef0123456789abcdef';
 const KM = 'fedcba9876543210fedcba9876543210';
@@ -10,9 +12,11 @@ export default function PA6Demo() {
   const [cca, setCca] = useState(null);
   const [flipBit, setFlipBit] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const encrypt = async () => {
     setLoading(true);
+    setError(null);
     try {
       const m = msg.padEnd(32,'0').slice(0,32);
       const [cpaEnc, ccaEnc] = await Promise.all([
@@ -21,12 +25,13 @@ export default function PA6Demo() {
       ]);
       setCpa(cpaEnc);
       setCca(ccaEnc);
-    } catch(e) {}
+    } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
   const flipAndDecrypt = async (mode) => {
     setLoading(true);
+    setError(null);
     try {
       if (mode === 'cpa' && cpa) {
         // Flip bit in ciphertext (CPA only — no MAC)
@@ -43,20 +48,31 @@ export default function PA6Demo() {
         // Try to decrypt with tampered ct — CCA_Dec will reject
         setCca(p => ({ ...p, rejected: true }));
       }
-    } catch(e) {}
+    } catch(e) { setError(e.message); }
     finally { setLoading(false); }
+  };
+
+  const reset = () => {
+    setMsg('deadbeef00112233');
+    setCpa(null);
+    setCca(null);
+    setFlipBit(0);
+    setError(null);
   };
 
   return (
     <div>
       <div className="demo-card">
-        <h4>⚔️ PA#6 — Malleability Attack Panel (CPA-only vs CCA)</h4>
-        <div className="form-group">
-          <label>Plaintext (hex)</label>
-          <input type="text" value={msg} onChange={e=>setMsg(e.target.value)} />
-        </div>
+        <DemoHeader num={6} title="Malleability Attack Panel" tag="IND-CCA" onReset={reset} />
+        <HexInput
+          label="Plaintext (hex)"
+          value={msg}
+          onChange={setMsg}
+          onEnter={encrypt}
+          disabled={loading}
+        />
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <button className="btn btn-primary" onClick={encrypt} disabled={loading}>Encrypt Both</button>
+          <button className="btn btn-primary" onClick={encrypt} disabled={loading}>{loading ? 'Encrypting…' : 'Encrypt Both'}</button>
           <span style={{ fontSize: '0.8rem', alignSelf: 'center', color: 'var(--text-secondary)' }}>
             Bit to flip: <input type="number" value={flipBit} onChange={e=>setFlipBit(+e.target.value)} style={{ width: 60, display: 'inline' }} />
           </span>
@@ -65,16 +81,17 @@ export default function PA6Demo() {
           <div className="demo-half broken">
             <h5>⚠ CPA-Only (malleable)</h5>
             {cpa && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cpa.ciphertext?.slice(0,32)}…</div>}
-            <button className="btn btn-danger" onClick={()=>flipAndDecrypt('cpa')} disabled={!cpa || loading}>Flip bit & Decrypt</button>
+            <button className="btn btn-danger" onClick={()=>flipAndDecrypt('cpa')} disabled={!cpa || loading}>{loading ? 'Decrypting…' : 'Flip bit & Decrypt'}</button>
             {cpa?.flippedDec && <div style={{ marginTop: 8 }}><div className="hex-display red">Corrupted PT: {cpa.flippedDec}</div><span className="badge badge-broken" style={{ marginTop: 6 }}>Malleability demonstrated!</span></div>}
           </div>
           <div className="demo-half secure">
             <h5>✓ CCA / Encrypt-then-MAC</h5>
             {cca && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cca.ciphertext?.slice(0,32)}… | Tag: {cca.tag?.slice(0,16)}…</div>}
-            <button className="btn btn-success" onClick={()=>flipAndDecrypt('cca')} disabled={!cca || loading}>Flip bit & Try Decrypt</button>
+            <button className="btn btn-success" onClick={()=>flipAndDecrypt('cca')} disabled={!cca || loading}>{loading ? 'Checking…' : 'Flip bit & Try Decrypt'}</button>
             {cca?.rejected && <div style={{ marginTop: 8 }}><div className="hex-display blue">Result: ⊥ (MAC verification failed)</div><span className="badge badge-secure" style={{ marginTop: 6 }}>CCA attack rejected!</span></div>}
           </div>
         </div>
+        {error && <div className="hex-display red" style={{ marginTop: 8 }}>Error: {error}</div>}
       </div>
     </div>
   );

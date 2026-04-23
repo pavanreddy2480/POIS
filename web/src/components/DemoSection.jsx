@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import BuildPanel from './BuildPanel';
 import ReducePanel from './ReducePanel';
 import ProofPanel from './ProofPanel';
@@ -54,12 +54,35 @@ export default function DemoSection({
 }) {
   const [active, setActive] = useState('home');
   const [navOpen, setNavOpen] = useState(true);
-  const demo = DEMOS.find(d => d.id === active);
+  const [mounted, setMounted] = useState(() => new Set());
+  const navRef = useRef(null);
+
+  const activateDemo = (id) => {
+    setActive(id);
+    if (id !== 'home') {
+      setMounted(prev => {
+        if (prev.has(id)) return prev;
+        return new Set([...prev, id]);
+      });
+    }
+  };
+
+  const handleNavKeyDown = (e) => {
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    const items = Array.from(navRef.current?.querySelectorAll('.demo-nav-item') || []);
+    const idx = items.indexOf(document.activeElement);
+    if (idx === -1) { items[0]?.focus(); return; }
+    const next = e.key === 'ArrowDown'
+      ? items[(idx + 1) % items.length]
+      : items[(idx - 1 + items.length) % items.length];
+    next?.focus();
+  };
 
   return (
     <div className="demo-layout">
       {/* Arc-style left nav */}
-      <nav className={`demo-nav${navOpen ? '' : ' collapsed'}`}>
+      <nav ref={navRef} className={`demo-nav${navOpen ? '' : ' collapsed'}`} onKeyDown={handleNavKeyDown}>
         {/* Collapse / expand toggle */}
         <div className="demo-nav-toggle">
           <button
@@ -75,7 +98,7 @@ export default function DemoSection({
         <div className="demo-nav-title">Explorer</div>
         <button
           className={`demo-nav-item${active === 'home' ? ' active' : ''}`}
-          onClick={() => setActive('home')}
+          onClick={() => activateDemo('home')}
         >
           <span className="demo-nav-num" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -94,18 +117,19 @@ export default function DemoSection({
           <button
             key={d.id}
             className={`demo-nav-item${active === d.id ? ' active' : ''}`}
-            onClick={() => setActive(d.id)}
+            onClick={() => activateDemo(d.id)}
           >
             <span className="demo-nav-num">PA{d.num}</span>
             <span className="demo-nav-label">{d.label}</span>
             <span className="demo-nav-tag">{d.tag}</span>
+            {mounted.has(d.id) && <span className="demo-nav-done" aria-label="visited" />}
           </button>
         ))}
       </nav>
 
       {/* Playground */}
       <div className="demo-playground">
-        {active === 'home' ? (
+        {active === 'home' && (
           <div className="explorer-panels">
             <BuildPanel
               foundation={foundation}
@@ -139,9 +163,14 @@ export default function DemoSection({
               routeInfo={routeInfo}
             />
           </div>
-        ) : (
-          demo && <demo.Component />
         )}
+        {DEMOS.map(d => (
+          mounted.has(d.id) ? (
+            <div key={d.id} style={{ display: active === d.id ? 'block' : 'none' }}>
+              <d.Component />
+            </div>
+          ) : null
+        ))}
       </div>
     </div>
   );

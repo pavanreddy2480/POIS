@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import DemoHeader from '../DemoHeader';
 
 function GGMTreeSVG({ path }) {
   if (!path || path.length === 0) return null;
@@ -168,15 +169,14 @@ export default function PA2Demo() {
     }
   };
 
+  const reset = () => { setKey('0123456789abcdef'); setQuery('1010'); setDepth(4); setTree(null); };
+
   useEffect(() => { run(); }, [query, key, depth]);
 
   return (
     <div>
       <div className="demo-card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h4>PA#2 — GGM Tree PRF Visualizer</h4>
-          <span className="badge badge-secure">SECURE</span>
-        </div>
+        <DemoHeader num={2} title="GGM Tree PRF Visualizer" tag="PRF" onReset={reset} />
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 12 }}>
           F_k(b₁b₂…bₙ) = G_bₙ(…G_b₁(k)…). Each bit steers left (0) or right (1).
           Dashed nodes are inactive siblings.

@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
+import CopyHex from '../CopyHex';
+import DemoHeader from '../DemoHeader';
+
+const SEED_DEFAULT = '0123456789abcdef';
+const LENGTH_DEFAULT = 32;
 
 export default function PA1Demo() {
-  const [seed, setSeed] = useState('0123456789abcdef');
-  const [length, setLength] = useState(32);
+  const [seed, setSeed] = useState(SEED_DEFAULT);
+  const [length, setLength] = useState(LENGTH_DEFAULT);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,13 +23,14 @@ export default function PA1Demo() {
 
   useEffect(() => { run(); }, [seed, length]);
 
+  const reset = () => { setSeed(SEED_DEFAULT); setLength(LENGTH_DEFAULT); };
   const ratio = result?.ones_ratio ?? 0.5;
   const barColor = Math.abs(ratio - 0.5) < 0.08 ? 'var(--accent-green)' : 'var(--accent-red)';
 
   return (
     <div>
       <div className="demo-card">
-        <h4>🎲 PA#1 — Live PRG Output Viewer</h4>
+        <DemoHeader num={1} title="Live PRG Output Viewer" tag="PRG" onReset={reset} />
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 14 }}>
           OWF-based Pseudorandom Generator: G(s) = b(x₀)‖b(x₁)‖… (HILL construction via DLP/AES)
         </p>
@@ -40,7 +46,7 @@ export default function PA1Demo() {
           <>
             <div className="form-group">
               <label>PRG Output (hex)</label>
-              <div className="hex-display">{result.output_hex}</div>
+              <CopyHex value={result.output_hex} />
             </div>
             <div className="form-group">
               <label>Randomness Test — Bit Ratio (expected ≈50%): {(ratio*100).toFixed(1)}%</label>
@@ -66,7 +72,7 @@ export default function PA1Demo() {
         {loading && <div className="spinner" style={{ margin: '10px auto', display: 'block' }} />}
       </div>
       <div className="demo-card">
-        <h4>📖 Security Note</h4>
+        <h4>Security Note</h4>
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
           <strong style={{ color: 'var(--text-primary)' }}>OWF → PRG:</strong> The HILL theorem proves that any OWF yields a PRG via the iterative hard-core bit construction.
           The DLP OWF (f(x) = g^x mod p) and AES OWF (f(k) = AES_k(0^128) ⊕ k) are used as concrete instantiations.

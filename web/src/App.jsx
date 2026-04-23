@@ -20,7 +20,7 @@ export default function App() {
   const [reduceSteps, setReduceSteps] = useState([]);
   const [loading, setLoading]       = useState(false);
   const [routeInfo, setRouteInfo]   = useState(null);
-  const [darkMode, setDarkMode]     = useState(false);
+  const [darkMode, setDarkMode]     = useState(true);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');

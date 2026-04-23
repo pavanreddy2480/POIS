@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import CopyHex from '../CopyHex';
+import HexInput from '../HexInput';
+import DemoHeader from '../DemoHeader';
 
 export default function PA10Demo() {
   const [key] = useState('0123456789abcdef');
@@ -7,20 +10,24 @@ export default function PA10Demo() {
   const [suffix, setSuffix] = useState('deadbeef');
   const [hmacTag, setHmacTag] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const reset = () => { setMsg('48656c6c6f20776f726c64'); setHmacTag(''); setError(null); };
 
   const computeHmac = async () => {
     setLoading(true);
+    setError(null);
     try {
       const r = await api.hmac.sign(key, msg.padEnd(16,'0'));
       setHmacTag(r.tag);
-    } catch(e) {}
+    } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
   return (
     <div>
       <div className="demo-card">
-        <h4>🔏 PA#10 — Length Extension Attack vs HMAC</h4>
+        <DemoHeader num={10} title="Length Extension Attack vs HMAC" tag="EUF-CMA" onReset={reset} />
         <div className="demo-row">
           <div className="demo-half broken">
             <h5>⚠ Naive H(k‖m) — Broken</h5>
@@ -39,12 +46,17 @@ export default function PA10Demo() {
             <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', marginBottom: 10 }}>
               HMAC = H((k⊕opad) ‖ H((k⊕ipad) ‖ m)). Outer hash with fresh key prevents extension.
             </p>
-            <div className="form-group">
-              <label>Message (hex)</label>
-              <input type="text" value={msg} onChange={e=>setMsg(e.target.value)} style={{ fontSize: '0.72rem' }} />
-            </div>
-            <button className="btn btn-success" onClick={computeHmac} disabled={loading} style={{ marginBottom: 8 }}>Compute HMAC</button>
-            {hmacTag && <div className="hex-display" style={{ fontSize: '0.7rem' }}>{hmacTag}</div>}
+            <HexInput
+              label="Message (hex)"
+              value={msg}
+              onChange={setMsg}
+              onEnter={computeHmac}
+              disabled={loading}
+              style={{ fontSize: '0.72rem' }}
+            />
+            <button className="btn btn-success" onClick={computeHmac} disabled={loading} style={{ marginBottom: 8 }}>{loading ? 'Computing…' : 'Compute HMAC'}</button>
+            {hmacTag && <CopyHex value={hmacTag} style={{ fontSize: '0.7rem' }} />}
+            {error && <div className="hex-display red" style={{ marginTop: 6, fontSize: '0.72rem' }}>Error: {error}</div>}
             <div style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--accent-green)' }}>
               Cannot extend: outer H resets state with k⊕opad
             </div>
@@ -52,7 +64,7 @@ export default function PA10Demo() {
         </div>
       </div>
       <div className="demo-card">
-        <h4>📐 HMAC_k(m) = H((k⊕opad) ‖ H((k⊕ipad) ‖ m))</h4>
+        <h4>HMAC_k(m) = H((k⊕opad) ‖ H((k⊕ipad) ‖ m))</h4>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.78rem', lineHeight: 2, color: 'var(--text-secondary)' }}>
           <div>ipad = 0x36 repeated b times</div>
           <div>opad = 0x5C repeated b times</div>

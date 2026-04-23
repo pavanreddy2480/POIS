@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import DemoHeader from '../DemoHeader';
 
 export default function PA11Demo() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [eveEnabled, setEveEnabled] = useState(false);
+
+  const reset = () => { setResult(null); setEveEnabled(false); };
 
   const run = async () => {
     setLoading(true);
@@ -18,14 +21,14 @@ export default function PA11Demo() {
   return (
     <div>
       <div className="demo-card">
-        <h4>🤝 PA#11 — Live Diffie-Hellman Key Exchange</h4>
+        <DemoHeader num={11} title="Live Diffie-Hellman Key Exchange" tag="DH" onReset={reset} />
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 14 }}>
           Alice and Bob establish a shared secret K = g^(ab) mod p over a public channel.
           Eve sees g^a and g^b but cannot compute g^(ab) (CDH assumption).
         </p>
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           <button className="btn btn-primary" onClick={run} disabled={loading}>
-            {loading ? '⏳ Exchanging...' : '▶ Run DH Exchange'}
+            {loading ? 'Exchanging...' : '▶ Run DH Exchange'}
           </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={eveEnabled} onChange={e=>setEveEnabled(e.target.checked)} />
@@ -66,7 +69,7 @@ export default function PA11Demo() {
         {result?.error && <div className="hex-display red">{result.error}</div>}
         {eveEnabled && (
           <div style={{ marginTop: 14, padding: 12, background: 'rgba(231,76,60,0.08)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 6, fontSize: '0.78rem', color: 'var(--accent-red)' }}>
-            ⚠ MITM Attack: Eve intercepts A and B, substitutes A'=g^e and B'=g^e.
+            MITM Attack: Eve intercepts A and B, substitutes A'=g^e and B'=g^e.
             Alice and Bob each compute a different key — Eve can read all traffic!
             Basic DH provides no authentication.
           </div>

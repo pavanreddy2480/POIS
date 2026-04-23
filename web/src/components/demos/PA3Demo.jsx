@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { api } from '../../api';
+import HexInput from '../HexInput';
+import DemoHeader from '../DemoHeader';
 
 export default function PA3Demo() {
   const [key] = useState(() => Array.from({length:16},()=>Math.floor(Math.random()*256).toString(16).padStart(2,'0')).join(''));
@@ -9,10 +11,12 @@ export default function PA3Demo() {
   const [advantage, setAdvantage] = useState(0);
   const [reuse, setReuse] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const playRound = async () => {
     if (!m0 || !m1 || m0.length !== m1.length) return;
     setLoading(true);
+    setError(null);
     try {
       const b = Math.random() < 0.5 ? 0 : 1;
       const msg = b === 0 ? m0 : m1;
@@ -33,33 +37,48 @@ export default function PA3Demo() {
         setAdvantage(Math.abs(wins/next.length - 0.5));
         return next;
       });
-    } catch(e) {}
+    } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
   const advColor = advantage < 0.1 ? 'var(--accent-green)' : 'var(--accent-red)';
 
+  const reset = () => {
+    setM0('48656c6c6f');
+    setM1('576f726c64');
+    setRounds([]);
+    setAdvantage(0);
+    setReuse(false);
+    setError(null);
+  };
+
   return (
     <div>
       <div className="demo-card">
-        <h4>🎮 PA#3 — IND-CPA Security Game</h4>
+        <DemoHeader num={3} title="IND-CPA Security Game" tag="IND-CPA" onReset={reset} />
         <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 14 }}>
           Play the IND-CPA game: challenger encrypts either m₀ or m₁; you try to guess which.
           In secure mode, your advantage should converge to ≈0.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div className="form-group">
-            <label>Message m₀ (hex)</label>
-            <input type="text" value={m0} onChange={e=>setM0(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>Message m₁ (hex, same length)</label>
-            <input type="text" value={m1} onChange={e=>setM1(e.target.value)} />
-          </div>
+          <HexInput
+            label="Message m₀ (hex)"
+            value={m0}
+            onChange={setM0}
+            onEnter={playRound}
+            disabled={loading}
+          />
+          <HexInput
+            label="Message m₁ (hex, same length)"
+            value={m1}
+            onChange={setM1}
+            onEnter={playRound}
+            disabled={loading}
+          />
         </div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
           <button className="btn btn-primary" onClick={playRound} disabled={loading}>
-            Encrypt (Challenger picks b)
+            {loading ? 'Encrypting…' : 'Encrypt (Challenger picks b)'}
           </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={reuse} onChange={e=>setReuse(e.target.checked)} />
@@ -86,6 +105,7 @@ export default function PA3Demo() {
         <div style={{ marginTop: 10, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
           Rounds played: {rounds.length}/20 | Advantage: {(advantage).toFixed(3)}
         </div>
+        {error && <div className="hex-display red" style={{ marginTop: 8 }}>Error: {error}</div>}
       </div>
     </div>
   );
