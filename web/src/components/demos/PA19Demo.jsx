@@ -14,7 +14,6 @@ export default function PA19Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await api.secureAnd.compute(a, b);
       setResult(r);
@@ -71,7 +70,7 @@ export default function PA19Demo() {
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
           <button className="btn btn-primary" onClick={run} disabled={loading}>
-            {loading ? 'Running OT…' : 'Compute Secure AND'}
+            {'Compute Secure AND'}
           </button>
           <button className="btn btn-secondary" onClick={() => setShowTable(!showTable)}>
             {showTable ? 'Hide' : 'Show'} Truth Table

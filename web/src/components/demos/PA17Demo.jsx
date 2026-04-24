@@ -9,7 +9,6 @@ export default function PA17Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await post('/cca/demo', { message: msg, tamper_ciphertext: tamper });
       setResult(r);
@@ -41,7 +40,7 @@ export default function PA17Demo() {
           Tamper ciphertext (simulate chosen-ciphertext attack)
         </label>
         <button className="btn btn-primary" onClick={run} disabled={loading}>
-          {loading ? 'Working…' : 'Encrypt & Decrypt'}
+          {'Encrypt & Decrypt'}
         </button>
 
         {result && !result.error && (

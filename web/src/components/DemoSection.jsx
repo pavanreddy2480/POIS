@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import BuildPanel from './BuildPanel';
 import ReducePanel from './ReducePanel';
 import ProofPanel from './ProofPanel';
@@ -51,19 +51,41 @@ export default function DemoSection({
   primitives, keyHex, setKeyHex, queryHex, setQueryHex,
   buildSteps, reduceSteps, routeInfo,
   proofOpen, setProofOpen, direction, proofChain, onRun,
+  onActiveChange,
 }) {
-  const [active, setActive] = useState('home');
-  const [navOpen, setNavOpen] = useState(true);
-  const [mounted, setMounted] = useState(() => new Set());
+  const [active, setActive] = useState(() => localStorage.getItem('activeDemo') || 'home');
+  const [navOpen, setNavOpen] = useState(() => localStorage.getItem('navOpen') !== 'false');
+  const [mounted, setMounted] = useState(() => {
+    const a = localStorage.getItem('activeDemo') || 'home';
+    return a !== 'home' ? new Set([a]) : new Set();
+  });
+  const [freshId, setFreshId] = useState(null);
   const navRef = useRef(null);
+  const freshTimer = useRef(null);
+
+  useEffect(() => { localStorage.setItem('navOpen', navOpen); }, [navOpen]);
+
+  useEffect(() => {
+    const demo = DEMOS.find(d => d.id === active);
+    onActiveChange?.(active, demo?.label ?? null);
+  }, []); // notify parent of initial active state
 
   const activateDemo = (id) => {
     setActive(id);
+    localStorage.setItem('activeDemo', id);
+    const demo = DEMOS.find(d => d.id === id);
+    onActiveChange?.(id, demo?.label ?? null);
     if (id !== 'home') {
+      const isNew = !mounted.has(id);
       setMounted(prev => {
         if (prev.has(id)) return prev;
         return new Set([...prev, id]);
       });
+      if (isNew) {
+        clearTimeout(freshTimer.current);
+        setFreshId(id);
+        freshTimer.current = setTimeout(() => setFreshId(null), 520);
+      }
     }
   };
 
@@ -130,6 +152,12 @@ export default function DemoSection({
       {/* Playground */}
       <div className="demo-playground">
         {active === 'home' && (
+          <div className="home-hint">
+            <span className="home-hint-icon">⬡</span>
+            <span>Pick a <strong>source</strong> and <strong>target</strong> primitive below to trace the security reduction, or select a <strong>PA assignment</strong> from the sidebar to explore live interactive demos.</span>
+          </div>
+        )}
+        {active === 'home' && (
           <div className="explorer-panels">
             <BuildPanel
               foundation={foundation}
@@ -164,10 +192,32 @@ export default function DemoSection({
             />
           </div>
         )}
-        {DEMOS.map(d => (
+        {DEMOS.map((d, idx) => (
           mounted.has(d.id) ? (
-            <div key={d.id} style={{ display: active === d.id ? 'block' : 'none' }}>
-              <d.Component />
+            <div key={d.id} style={{ display: active === d.id ? 'block' : 'none', position: 'relative' }}>
+              {freshId === d.id && (
+                <div className="demo-skeleton-overlay">
+                  <div className="demo-skeleton-card">
+                    <div className="skel skel-hdr" />
+                    <div className="skel skel-line skel-w70" />
+                    <div className="skel skel-line skel-w50" />
+                    <div className="skel skel-block" />
+                  </div>
+                </div>
+              )}
+              <d.Component onNavigate={activateDemo} />
+              <div className="demo-page-nav">
+                {idx > 0 ? (
+                  <button className="demo-page-nav-btn" onClick={() => activateDemo(DEMOS[idx - 1].id)}>
+                    ← PA{DEMOS[idx - 1].num} {DEMOS[idx - 1].label}
+                  </button>
+                ) : <span />}
+                {idx < DEMOS.length - 1 ? (
+                  <button className="demo-page-nav-btn next" onClick={() => activateDemo(DEMOS[idx + 1].id)}>
+                    PA{DEMOS[idx + 1].num} {DEMOS[idx + 1].label} →
+                  </button>
+                ) : <span />}
+              </div>
             </div>
           ) : null
         ))}

@@ -55,75 +55,59 @@ function PrimitivePill({ label, highlight, isLeaf }) {
   );
 }
 
-function Arrow({ theorem, security, active, dim }) {
+
+function Arrow({ theorem, security, active }) {
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      flex: '1 1 80px', minWidth: 60, maxWidth: 180,
-      opacity: dim ? 0.4 : 1,
-      transition: 'opacity 0.3s',
-    }}>
+    <div style={{ position: 'relative', width: 120, flexShrink: 0, height: 20 }}>
       <div style={{
+        position: 'absolute', bottom: '100%', left: 0, right: 0,
+        paddingBottom: 3,
         fontSize: '0.65rem', color: 'var(--accent-orange)',
-        fontFamily: 'var(--font-mono)', marginBottom: 2,
-        textAlign: 'center', maxWidth: 120,
+        fontFamily: 'var(--font-mono)',
+        textAlign: 'center',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }} title={theorem}>
-        {theorem}
-      </div>
-      <div style={{ position: 'relative', width: '100%', height: 20 }}>
-        <svg width="100%" height="20" style={{ overflow: 'visible' }}>
-          <defs>
-            <marker id={`arrowhead-${active ? 'a' : 'i'}`} markerWidth="6" markerHeight="4"
-              refX="6" refY="2" orient="auto">
-              <polygon points="0 0, 6 2, 0 4"
-                fill={active ? 'var(--accent-blue)' : 'var(--border)'} />
-            </marker>
-          </defs>
-          <line x1="0" y1="10" x2="100%" y2="10"
-            stroke={active ? 'var(--accent-blue)' : 'var(--border)'}
-            strokeWidth={active ? 2 : 1}
-            markerEnd={`url(#arrowhead-${active ? 'a' : 'i'})`}
-          />
-        </svg>
-        <FlowDot active={active} />
-      </div>
+      }} title={theorem}>{theorem}</div>
+      <svg width="100%" height="20" style={{ overflow: 'visible', display: 'block' }}>
+        <defs>
+          <marker id={`ah-${active ? 'a' : 'i'}`} markerWidth="6" markerHeight="4"
+            refX="6" refY="2" orient="auto">
+            <polygon points="0 0, 6 2, 0 4"
+              fill={active ? 'var(--accent-blue)' : 'var(--border)'} />
+          </marker>
+        </defs>
+        <line x1="0" y1="10" x2="100%" y2="10"
+          stroke={active ? 'var(--accent-blue)' : 'var(--border)'}
+          strokeWidth={active ? 2 : 1}
+          markerEnd={`url(#ah-${active ? 'a' : 'i'})`}
+        />
+      </svg>
+      <FlowDot active={active} />
       <div style={{
+        position: 'absolute', top: '100%', left: 0, right: 0,
+        paddingTop: 3,
         fontSize: '0.6rem', color: 'var(--text-muted)',
-        textAlign: 'center', maxWidth: 120, marginTop: 2,
+        textAlign: 'center', lineHeight: 1.3,
         overflow: 'hidden', display: '-webkit-box',
         WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-      }} title={security}>
-        {security}
-      </div>
+      }} title={security}>{security}</div>
     </div>
   );
 }
 
 function FlowDiagram({ nodes, activeSource, activeTarget }) {
   if (!nodes || nodes.length === 0) return null;
-
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', overflowX: 'auto',
-      padding: '16px 8px', gap: 0,
-    }}>
-      {nodes.map((n, i) => {
+    <div style={{ display: 'flex', alignItems: 'center', padding: '20px 8px', overflowX: 'auto', gap: 0 }}>
+      {nodes.map((node, i) => {
         const isLast = i === nodes.length - 1;
-        const isFirst = i === 0;
-        const isActive = n.primitive === activeSource || n.primitive === activeTarget;
-        const isLeaf = isLast && !isFirst;
+        const isActive = node.primitive === activeSource || node.primitive === activeTarget;
+        const isLeaf = isLast && i !== 0;
+        const nextNode = nodes[i + 1];
+        const arrowActive = isActive || (nextNode && (nextNode.primitive === activeSource || nextNode.primitive === activeTarget));
         return (
           <React.Fragment key={i}>
-            <PrimitivePill label={n.primitive} highlight={isActive} isLeaf={isLeaf && !isActive} />
-            {!isLast && (
-              <Arrow
-                theorem={nodes[i + 1].theorem}
-                security={nodes[i + 1].security}
-                active={isActive || nodes[i + 1].primitive === activeSource || nodes[i + 1].primitive === activeTarget}
-                dim={false}
-              />
-            )}
+            <PrimitivePill label={node.primitive} highlight={isActive} isLeaf={isLeaf && !isActive} />
+            {!isLast && <Arrow theorem={nextNode.theorem} security={nextNode.security} active={!!arrowActive} />}
           </React.Fragment>
         );
       })}

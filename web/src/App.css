@@ -156,7 +156,15 @@ html, body, #root {
   letter-spacing: -0.01em;
   white-space: nowrap;
   flex-shrink: 0;
-  /* Blue accent on the "CS8.401" part via a span trick — we style the whole title cleanly */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 520px;
+}
+
+.top-bar-breadcrumb {
+  font-weight: 400;
+  color: var(--text-muted);
+  font-size: 0.85rem;
 }
 
 /* Foundation pill-toggle */
@@ -807,13 +815,20 @@ select {
   gap: 8px;
 }
 
-/* ── Demo Card Header (standardized) ────────────────────────── */
+/* ── Demo Card Header (standardized, sticky) ────────────────── */
 .demo-card-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 14px;
   flex-wrap: wrap;
+  /* bleed to card edges and stick to playground top on scroll */
+  z-index: 10;
+  margin: -18px -20px 16px;
+  padding: 12px 20px;
+  background: var(--bg-card);
+  backdrop-filter: blur(6px);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  box-shadow: 0 1px 0 var(--border-light);
 }
 
 /* Override the generic .demo-card h4 rule for structured headers */
@@ -958,14 +973,204 @@ select {
   background: var(--accent-green-bg);
 }
 
+/* ── Inline copy button for result-val ───────────────────────── */
+.copy-val-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.copy-val-btn {
+  padding: 1px 6px;
+  font-size: 0.62rem;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all var(--transition);
+  opacity: 0;
+  line-height: 1.4;
+}
+
+.copy-val-wrap:hover .copy-val-btn {
+  opacity: 1;
+}
+
+.copy-val-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+}
+
+.copy-val-btn.copied {
+  opacity: 1;
+  color: var(--accent-green);
+  border-color: rgba(34, 197, 94, 0.5);
+  background: var(--accent-green-bg);
+}
+
+/* ── Skeleton loader ─────────────────────────────────────────── */
+@keyframes skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes skel-overlay-out {
+  0%   { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.demo-skeleton-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: var(--bg-page);
+  animation: skel-overlay-out 0.2s ease 0.3s forwards;
+}
+
+.demo-skeleton-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  margin-bottom: 14px;
+}
+
+.skel {
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--bg-well) 0%, var(--border) 50%, var(--bg-well) 100%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.2s ease infinite;
+}
+
+.skel-hdr  { height: 22px; width: 55%; margin-bottom: 16px; }
+.skel-line { height: 12px; margin-bottom: 8px; }
+.skel-block{ height: 90px; width: 100%; margin-top: 16px; border-radius: 8px; }
+.skel-w70  { width: 70%; }
+.skel-w50  { width: 50%; }
+
+/* ── Home hint banner ────────────────────────────────────────── */
+.home-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent-blue-bg);
+  border: 1px solid rgba(79, 108, 247, 0.18);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.home-hint strong {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.home-hint-icon {
+  font-size: 1.1rem;
+  color: var(--accent-blue);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+/* ── Demo page prev/next navigation ─────────────────────────── */
+.demo-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0 4px;
+  margin-top: 4px;
+  gap: 10px;
+}
+
+.demo-page-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+  box-shadow: var(--shadow-card);
+}
+
+.demo-page-nav-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  background: var(--accent-blue-bg);
+  box-shadow: 0 2px 8px rgba(79, 108, 247, 0.15);
+  transform: translateY(-1px);
+}
+
+.demo-page-nav-btn.next {
+  margin-left: auto;
+}
+
+/* ── Inter-demo navigation chip ─────────────────────────────── */
+.demo-related {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-light);
+  flex-wrap: wrap;
+}
+
+.demo-related-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.demo-xlink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  background: var(--accent-blue-bg);
+  color: var(--accent-blue);
+  border: 1px solid rgba(79, 108, 247, 0.25);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.demo-xlink:hover {
+  background: var(--accent-blue);
+  color: var(--text-on-accent);
+  border-color: var(--accent-blue);
+}
+
 /* ── Done indicator (visited demo dot) ───────────────────────── */
+@keyframes dot-fadein {
+  from { opacity: 0; transform: scale(0.4); }
+  to   { opacity: 0.85; transform: scale(1); }
+}
+
 .demo-nav-done {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent-green);
+  background: var(--accent-blue);
   flex-shrink: 0;
-  opacity: 0.85;
+  animation: dot-fadein 0.35s ease forwards;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────── */
@@ -1001,7 +1206,6 @@ select {
   background: var(--accent-blue-hover);
   border-color: var(--accent-blue-hover);
   box-shadow: 0 3px 12px rgba(79, 108, 247, 0.35);
-  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -1039,12 +1243,20 @@ select {
   border-color: var(--accent-green);
 }
 
+.btn:active:not(:disabled) {
+  transform: scale(0.96);
+  filter: brightness(0.88);
+  transition-duration: 0.06s;
+}
+
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+  pointer-events: none;
 }
+
 
 /* ── Status Badges ───────────────────────────────────────────── */
 .badge {
@@ -1124,6 +1336,22 @@ select {
 .hex-input:focus {
   border-color: var(--border-focus);
   box-shadow: var(--shadow-input);
+}
+
+/* ── Universal active press feedback (non-.btn buttons) ─────── */
+.foundation-toggle button:active,
+.direction-toggle button:active,
+.demo-nav-item:active,
+.demo-nav-toggle-btn:active,
+.demo-page-nav-btn:active,
+.demo-xlink:active,
+.demo-reset-btn:active,
+.copy-btn:active,
+.copy-val-btn:active,
+.demo-tab:active {
+  filter: brightness(0.85);
+  transform: scale(0.95);
+  transition-duration: 0.06s;
 }
 
 /* ── Spinner ─────────────────────────────────────────────────── */

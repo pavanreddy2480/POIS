@@ -12,7 +12,6 @@ export default function PA20Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await api.mpc.millionaire(
         Math.min(x, maxVal),
@@ -89,7 +88,7 @@ export default function PA20Demo() {
         </div>
 
         <button className="btn btn-primary" onClick={run} disabled={loading}>
-          {loading ? 'Evaluating Circuit…' : 'Run Secure Comparison'}
+          {'Run Secure Comparison'}
         </button>
 
         {result && !result.error && (

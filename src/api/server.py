@@ -117,6 +117,19 @@ class ModeEncRequest(BaseModel):
     message_hex: str
     iv_hex: Optional[str] = None
 
+class ModeBlocksRequest(BaseModel):
+    mode: str
+    key_hex: str
+    message_hex: str
+    iv_hex: Optional[str] = None
+
+class FlipBitRequest(BaseModel):
+    mode: str
+    key_hex: str
+    iv_hex: str
+    ciphertext_hex: str
+    block_index: int
+
 class MACRequest(BaseModel):
     key_hex: str
     message_hex: str
@@ -141,8 +154,18 @@ class HMACRequest(BaseModel):
     key_hex: str
     message_hex: str
 
+class LengthExtRequest(BaseModel):
+    key_hex: str
+    message_hex: str
+    suffix_hex: str = 'deadbeef'
+
 class DHRequest(BaseModel):
     bits: int = 32
+
+class DHCustomRequest(BaseModel):
+    bits: int = 32
+    alice_priv_hex: Optional[str] = None
+    bob_priv_hex: Optional[str] = None
 
 class RSAKeygenRequest(BaseModel):
     bits: int = 128
@@ -190,6 +213,7 @@ class RSADemoRequest(BaseModel):
 
 class HastadDemoRequest(BaseModel):
     message: int
+    use_pkcs: bool = False
 
 class SigDemoRequest(BaseModel):
     message: str
@@ -331,6 +355,117 @@ def modes_encrypt(mode: str, req: ModeEncRequest):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/modes/encrypt_blocks")
+def modes_encrypt_blocks(req: ModeBlocksRequest):
+    try:
+        from src.pa02_prf.aes_impl import aes_encrypt
+        k = bytes.fromhex(req.key_hex)
+        m = bytes.fromhex(req.message_hex)
+        BLOCK = 16
+        mode = req.mode.upper()
+
+        if mode == "CBC":
+            iv = bytes.fromhex(req.iv_hex) if req.iv_hex else os.urandom(BLOCK)
+            pad_len = BLOCK - (len(m) % BLOCK)
+            padded = m + bytes([pad_len] * pad_len)
+            blocks = []
+            prev = iv
+            full_ct = b''
+            for i in range(0, len(padded), BLOCK):
+                pt_block = padded[i:i+BLOCK]
+                xor_in = bytes(a ^ b for a, b in zip(pt_block, prev))
+                ct_block = aes_encrypt(k, xor_in)
+                blocks.append({"idx": i//BLOCK, "plaintext": pt_block.hex(),
+                               "prev": prev.hex(), "xor_input": xor_in.hex(),
+                               "ciphertext": ct_block.hex()})
+                full_ct += ct_block
+                prev = ct_block
+            return {"mode": "CBC", "iv": iv.hex(), "ciphertext": full_ct.hex(), "blocks": blocks}
+
+        elif mode == "OFB":
+            iv = bytes.fromhex(req.iv_hex) if req.iv_hex else os.urandom(BLOCK)
+            blocks = []
+            state = iv
+            full_ct = b''
+            for i in range(0, len(m), BLOCK):
+                state = aes_encrypt(k, state)
+                pt_block = m[i:i+BLOCK]
+                ct_block = bytes(a ^ b for a, b in zip(pt_block, state))
+                blocks.append({"idx": i//BLOCK, "keystream_state": state.hex(),
+                               "plaintext": pt_block.hex(), "ciphertext": ct_block.hex()})
+                full_ct += ct_block
+            return {"mode": "OFB", "iv": iv.hex(), "ciphertext": full_ct.hex(), "blocks": blocks}
+
+        elif mode == "CTR":
+            r = bytes.fromhex(req.iv_hex) if req.iv_hex else os.urandom(BLOCK)
+            r_int = int.from_bytes(r, 'big')
+            blocks = []
+            full_ct = b''
+            for i in range(0, len(m), BLOCK):
+                ctr_val = (r_int + i//BLOCK) % (2**128)
+                ctr_bytes = ctr_val.to_bytes(BLOCK, 'big')
+                ks_block = aes_encrypt(k, ctr_bytes)
+                pt_block = m[i:i+BLOCK]
+                ct_block = bytes(a ^ b for a, b in zip(pt_block, ks_block))
+                blocks.append({"idx": i//BLOCK, "counter": ctr_bytes.hex(),
+                               "keystream": ks_block.hex(), "plaintext": pt_block.hex(),
+                               "ciphertext": ct_block.hex()})
+                full_ct += ct_block
+            return {"mode": "CTR", "nonce": r.hex(), "ciphertext": full_ct.hex(), "blocks": blocks}
+
+        else:
+            raise HTTPException(400, f"Unknown mode: {mode}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/modes/flip_and_decrypt")
+def modes_flip_and_decrypt(req: FlipBitRequest):
+    try:
+        from src.pa04_modes.modes import CBCMode, OFBMode, CTRMode
+        k = bytes.fromhex(req.key_hex)
+        ct = bytearray(bytes.fromhex(req.ciphertext_hex))
+        BLOCK = 16
+        mode = req.mode.upper()
+        n_blocks = len(ct) // BLOCK
+
+        flip_pos = req.block_index * BLOCK
+        if flip_pos >= len(ct):
+            raise HTTPException(400, "Block index out of range")
+        ct[flip_pos] ^= 0x80
+
+        prf = get_aes_prf()
+        iv = bytes.fromhex(req.iv_hex)
+
+        if mode == "CBC":
+            try:
+                pt = CBCMode(prf).decrypt(k, iv, bytes(ct))
+                decrypted = pt.hex()
+            except Exception:
+                decrypted = None
+            corrupted = [req.block_index]
+            if req.block_index + 1 < n_blocks:
+                corrupted.append(req.block_index + 1)
+        elif mode == "OFB":
+            pt = OFBMode(prf).decrypt(k, iv, bytes(ct))
+            decrypted = pt.hex()
+            corrupted = [req.block_index]
+        elif mode == "CTR":
+            pt = CTRMode(prf).decrypt(k, iv, bytes(ct))
+            decrypted = pt.hex()
+            corrupted = [req.block_index]
+        else:
+            raise HTTPException(400, f"Unknown mode: {mode}")
+
+        return {"decrypted": decrypted, "corrupted_blocks": corrupted, "mode": mode}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 # ── PA#5 MAC ──────────────────────────────────────────────────────────────────
 
 @app.post("/api/mac/sign")
@@ -386,8 +521,8 @@ def md_hash(req: HashRequest):
         def toy_compress(state: bytes, block: bytes) -> bytes:
             return bytes(a ^ b for a, b in zip(state, block[:len(state)]))
         md = MerkleDamgard(toy_compress, b'\x00'*4, 8)
-        digest = md.hash(msg)
-        return {"message": req.message_hex, "digest": digest.hex()}
+        result = md.hash_with_chain(msg)
+        return result
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -433,6 +568,44 @@ def hmac_sign(req: HMACRequest):
     except Exception as e:
         raise HTTPException(400, str(e))
 
+@app.post("/api/hmac/length_extension")
+def hmac_length_extension(req: LengthExtRequest):
+    try:
+        k = bytes.fromhex(req.key_hex)
+        m = bytes.fromhex(req.message_hex)
+        suffix = bytes.fromhex(req.suffix_hex)
+        H = get_dlp_hash()
+
+        # Naive MAC: t = H(k || m) — what the server issues
+        naive_tag = H.hash(k + m)
+
+        # Padding of k||m (attacker knows this if they know len(k) and m)
+        pad_k_m = H.md.pad(k + m)
+        full_len = len(pad_k_m)
+
+        # Attacker's forged tag: start MD from state=naive_tag, process suffix
+        # The padding for the suffix must account for the length offset (full_len bytes before it)
+        suffix_blocks = H.md.pad(b'\x00' * full_len + suffix)[full_len:]
+        state = naive_tag
+        for i in range(0, len(suffix_blocks), H.md.block_size):
+            state = H.group.compress_fn(state, suffix_blocks[i:i + H.md.block_size])
+        attacker_tag = state
+
+        # Ground truth: H(pad(k||m) || suffix) computed from scratch — should match attacker_tag
+        ground_truth = H.hash(pad_k_m + suffix)
+        attack_succeeds = attacker_tag == ground_truth
+
+        return {
+            "naive_tag": naive_tag.hex(),
+            "pad_k_m_hex": pad_k_m.hex(),
+            "suffix_hex": suffix.hex(),
+            "attacker_tag": attacker_tag.hex(),
+            "ground_truth_tag": ground_truth.hex(),
+            "attack_succeeds": attack_succeeds,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
 @app.post("/api/hmac/verify")
 def hmac_verify(req: MACVerifyRequest):
     try:
@@ -454,6 +627,38 @@ def dh_exchange(req: DHRequest):
         dh = DiffieHellman(bits=req.bits)
         result = dh.full_exchange()
         return result
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post("/api/dh/exchange_custom")
+def dh_exchange_custom(req: DHCustomRequest):
+    try:
+        from src.pa11_dh.dh import DiffieHellman
+        from src.pa13_miller_rabin.miller_rabin import mod_pow
+        dh = DiffieHellman(bits=req.bits)
+        if req.alice_priv_hex:
+            a = int(req.alice_priv_hex, 16) % dh.q
+            if a < 2:
+                a = 2
+        else:
+            a, _ = dh.dh_alice_step1()
+        if req.bob_priv_hex:
+            b = int(req.bob_priv_hex, 16) % dh.q
+            if b < 2:
+                b = 2
+        else:
+            b, _ = dh.dh_bob_step1()
+        A = mod_pow(dh.g, a, dh.p)
+        B = mod_pow(dh.g, b, dh.p)
+        KA = dh.dh_alice_step2(a, B)
+        KB = dh.dh_bob_step2(b, A)
+        return {
+            "p": hex(dh.p), "q": hex(dh.q), "g": hex(dh.g),
+            "alice_private": hex(a), "alice_public": hex(A),
+            "bob_private": hex(b), "bob_public": hex(B),
+            "alice_shared_secret": hex(KA), "bob_shared_secret": hex(KB),
+            "keys_match": KA == KB,
+        }
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -525,7 +730,7 @@ def crt_solve(req: CRTRequest):
 def hastad(req: CRTRequest):
     try:
         from src.pa14_crt.crt import hastad_attack
-        e = len(req.ciphertexts) if hasattr(req, 'ciphertexts') else 3
+        e = len(req.residues)  # number of ciphertexts equals the RSA exponent
         m = hastad_attack(req.residues, req.moduli, e)
         return {"recovered_m": m}
     except Exception as e:
@@ -648,6 +853,19 @@ def rsa_demo(req: RSADemoRequest):
             ct1 = ct1_int.to_bytes(k, 'big')
             ct2 = ct2_int.to_bytes(k, 'big')
             dec = rsa.pkcs15_dec(sk, ct1_int)
+            def extract_ps(ct_int):
+                m_int = rsa.rsa_dec(sk, ct_int)
+                em = m_int.to_bytes(k, 'big')
+                sep = em.index(0x00, 2)
+                return em[2:sep].hex()
+            ps1 = extract_ps(ct1_int)
+            ps2 = extract_ps(ct2_int)
+            return {
+                "ct1": ct1.hex(), "ct2": ct2.hex(),
+                "identical": ct1 == ct2,
+                "decrypted": dec.hex() if dec else None,
+                "ps1": ps1, "ps2": ps2,
+            }
         else:
             m_int = int.from_bytes(m_bytes, 'big') % pk[0]
             ct1_int = rsa.rsa_enc(pk, m_int)
@@ -673,19 +891,30 @@ def rsa_demo(req: RSADemoRequest):
 def hastad_demo(req: HastadDemoRequest):
     try:
         from src.pa12_rsa.rsa import RSA
-        from src.pa14_crt.crt import hastad_attack
+        from src.pa14_crt.crt import crt, integer_nth_root
         m = req.message
         e = 3
         rsa_inst = RSA()
         keys_list = [rsa_inst.keygen(128) for _ in range(3)]
         moduli = [k["pk"][0] for k in keys_list]
-        ciphertexts = [pow(m, e, N) for N in moduli]
-        recovered = hastad_attack(ciphertexts, moduli, e=e)
+
+        if req.use_pkcs:
+            m_bytes = m.to_bytes((m.bit_length() + 7) // 8 or 1, 'big')
+            ciphertexts = [rsa_inst.pkcs15_enc(k["pk"], m_bytes) for k in keys_list]
+        else:
+            ciphertexts = [pow(m, e, N) for N in moduli]
+
+        m_cubed_big = crt(ciphertexts, moduli)
+        root = integer_nth_root(m_cubed_big, e)
+        attack_succeeded = (root == m)
+
         return {
             "moduli": [str(N) for N in moduli],
             "ciphertexts": [str(c) for c in ciphertexts],
-            "m_cubed": str(ciphertexts[0]),
-            "recovered": str(recovered),
+            "m_cubed": str(m_cubed_big),
+            "recovered": str(root),
+            "attack_succeeded": attack_succeeded,
+            "use_pkcs": req.use_pkcs,
         }
     except Exception as e:
         raise HTTPException(400, str(e))

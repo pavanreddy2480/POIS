@@ -1,8 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const PA_NUMS = { OWF: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10 };
 
 export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, onRun }) {
+  const [busy, setBusy] = useState(false);
+  const handleRun = async () => {
+    setBusy(true);
+    try { await onRun(); } finally { setBusy(false); }
+  };
   return (
     <div className="column-panel">
       <div className="column-header">
@@ -67,7 +72,7 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
         </div>
       </div>
 
-      <button className="btn btn-primary" onClick={onRun} style={{ width: '100%', marginTop: 4 }}>
+      <button className="btn btn-primary" onClick={handleRun} disabled={busy} style={{ width: '100%', marginTop: 4 }}>
         ▶ Run Reduction
       </button>
     </div>

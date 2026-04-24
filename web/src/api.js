@@ -20,6 +20,7 @@ export async function get(endpoint) {
 }
 
 export const api = {
+  owf: { evaluate: (value) => post('/owf/evaluate', { value }) },
   prg: { generate: (seed_hex, length) => post('/prg/generate', { seed_hex, length }) },
   prf: {
     evaluate: (key_hex, input_hex) => post('/prf/evaluate', { key_hex, input_hex }),
@@ -32,6 +33,10 @@ export const api = {
   modes: {
     encrypt: (mode, key_hex, message_hex, iv_hex) =>
       post(`/modes/${mode}/encrypt`, { mode, key_hex, message_hex, iv_hex }),
+    encryptBlocks: (mode, key_hex, message_hex, iv_hex) =>
+      post('/modes/encrypt_blocks', { mode, key_hex, message_hex, iv_hex }),
+    flipAndDecrypt: (mode, key_hex, iv_hex, ciphertext_hex, block_index) =>
+      post('/modes/flip_and_decrypt', { mode, key_hex, iv_hex, ciphertext_hex, block_index }),
   },
   mac: {
     sign: (key_hex, message_hex) => post('/mac/sign', { key_hex, message_hex }),
@@ -48,8 +53,13 @@ export const api = {
   hmac: {
     sign: (key_hex, message_hex) => post('/hmac/sign', { key_hex, message_hex }),
     verify: (key_hex, message_hex, tag_hex) => post('/hmac/verify', { key_hex, message_hex, tag_hex }),
+    lengthExtension: (key_hex, message_hex, suffix_hex) => post('/hmac/length_extension', { key_hex, message_hex, suffix_hex }),
   },
-  dh: { exchange: (bits = 32) => post('/dh/exchange', { bits }) },
+  dh: {
+    exchange: (bits = 32) => post('/dh/exchange', { bits }),
+    exchangeCustom: (alice_priv_hex, bob_priv_hex, bits = 32) =>
+      post('/dh/exchange_custom', { alice_priv_hex, bob_priv_hex, bits }),
+  },
   rsa: {
     keygen: (bits = 128) => post('/rsa/keygen', { bits }),
     encrypt: (N_hex, e, m) => post('/rsa/encrypt', { N_hex, e, m }),

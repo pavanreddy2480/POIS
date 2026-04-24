@@ -9,7 +9,6 @@ export default function PA16Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await post('/elgamal/demo', {
         message: parseInt(m),
@@ -45,7 +44,7 @@ export default function PA16Demo() {
           </div>
         </div>
         <button className="btn btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 16 }}>
-          {loading ? 'Running…' : 'Encrypt & Attack'}
+          {'Encrypt & Attack'}
         </button>
 
         {result && !result.error && (

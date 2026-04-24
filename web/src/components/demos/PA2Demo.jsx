@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import DemoHeader from '../DemoHeader';
+import CopyVal from '../CopyVal';
 
 function GGMTreeSVG({ path }) {
   if (!path || path.length === 0) return null;
@@ -67,7 +68,7 @@ function GGMTreeSVG({ path }) {
           <polygon points="0 0,7 2.5,0 5" fill="var(--accent-blue)" />
         </marker>
         <marker id="ggm-arr-i" markerWidth="5" markerHeight="4" refX="4" refY="2" orient="auto">
-          <polygon points="0 0,5 2,0 4" fill="var(--border)" />
+          <polygon points="0 0,5 2,0 4" fill="var(--text-muted)" />
         </marker>
       </defs>
 
@@ -76,8 +77,8 @@ function GGMTreeSVG({ path }) {
         <g key={`e${i}`}>
           <line
             x1={e.x1} y1={e.y1} x2={e.x2} y2={e.y2}
-            stroke={e.active ? 'var(--accent-blue)' : 'var(--border)'}
-            strokeWidth={e.active ? 2 : 1}
+            stroke={e.active ? 'var(--accent-blue)' : 'var(--text-muted)'}
+            strokeWidth={e.active ? 2 : 1.5}
             strokeDasharray={e.active ? undefined : '5 3'}
             markerEnd={`url(#ggm-arr-${e.active ? 'a' : 'i'})`}
           />
@@ -102,12 +103,12 @@ function GGMTreeSVG({ path }) {
           : 'var(--bg-well)';
         const stroke = n.active
           ? n.isLeaf ? 'var(--accent-green)' : 'var(--accent-blue)'
-          : 'var(--border)';
+          : 'var(--text-muted)';
 
         return (
-          <g key={`n${i}`} opacity={n.active ? 1 : 0.38}>
+          <g key={`n${i}`} opacity={n.active ? 1 : 0.55}>
             <rect x={rx} y={n.y} width={nodeW} height={nodeH} rx={7}
-              fill={fill} stroke={stroke} strokeWidth={n.active ? 1.5 : 0.75}
+              fill={fill} stroke={stroke} strokeWidth={n.active ? 1.5 : 1}
             />
             <text
               x={n.cx} y={n.y + nodeH / 2 + 4}
@@ -171,6 +172,10 @@ export default function PA2Demo() {
 
   const reset = () => { setKey('0123456789abcdef'); setQuery('1010'); setDepth(4); setTree(null); };
 
+  useEffect(() => {
+    setQuery(q => q.padEnd(depth, '0').slice(0, depth));
+  }, [depth]);
+
   useEffect(() => { run(); }, [query, key, depth]);
 
   return (
@@ -184,8 +189,11 @@ export default function PA2Demo() {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, marginBottom: 12 }}>
           <div className="form-group">
-            <label>Key k (hex, 16 bytes)</label>
-            <input type="text" value={key} onChange={e => setKey(e.target.value)} maxLength={32} />
+            <label>Key k (hex, 16 bytes = 32 chars)</label>
+            <input
+              type="text" value={key} maxLength={32}
+              onChange={e => setKey(e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 32))}
+            />
           </div>
           <div className="form-group">
             <label>Query x (bits)</label>
@@ -234,8 +242,6 @@ export default function PA2Demo() {
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 4 }}>= b₁b₂…bₙ</span>
         </div>
 
-        {loading && <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: 8 }}>Computing…</div>}
-
         {tree && !tree.error && (
           <>
             {/* overflowX: auto so deep trees scroll rather than squish */}
@@ -249,7 +255,7 @@ export default function PA2Demo() {
             <div className="result-box">
               <div>
                 <span className="result-key">F_k(x) = </span>
-                <span className="result-val" style={{ color: 'var(--accent-green)' }}>{tree.output}</span>
+                <CopyVal value={tree.output} style={{ color: 'var(--accent-green)' }}>{tree.output}</CopyVal>
               </div>
               <div>
                 <span className="result-key">Query bits: </span>

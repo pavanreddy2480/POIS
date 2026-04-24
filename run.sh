@@ -16,9 +16,12 @@ pip install -r requirements.txt --quiet 2>/dev/null || true
 echo "[2/3] Checking Node dependencies..."
 (cd web && npm install --silent 2>/dev/null) || true
 
-# 3. Start FastAPI backend
+# 3. Start FastAPI backend (kill any process already on :8000 or :5173)
 echo "[3/3] Starting servers..."
 echo ""
+lsof -ti :8000 | xargs kill -9 2>/dev/null || true
+lsof -ti :5173 | xargs kill -9 2>/dev/null || true
+sleep 0.5
 python3 -m uvicorn src.api.server:app --host 127.0.0.1 --port 8000 --reload &
 BACKEND_PID=$!
 echo "  Backend: http://localhost:8000"

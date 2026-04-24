@@ -15,7 +15,6 @@ export default function PA18Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await api.ot.run(b, strToInt(m0), strToInt(m1));
       setResult({ ...r, m0_int: strToInt(m0), m1_int: strToInt(m1) });
@@ -63,7 +62,7 @@ export default function PA18Demo() {
           ))}
         </div>
         <button className="btn btn-primary" onClick={run} disabled={loading}>
-          {loading ? 'Running OT…' : 'Run OT Protocol'}
+          {'Run OT Protocol'}
         </button>
 
         {result && !result.error && (

@@ -12,33 +12,33 @@ export default function PA3Demo() {
   const [reuse, setReuse] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pendingRound, setPendingRound] = useState(null);
 
-  const playRound = async () => {
+  const requestChallenge = async () => {
     if (!m0 || !m1 || m0.length !== m1.length) return;
     setLoading(true);
     setError(null);
     try {
       const b = Math.random() < 0.5 ? 0 : 1;
       const msg = b === 0 ? m0 : m1;
-      let enc;
-      if (reuse) {
-        enc = await api.enc.cpa(key, msg.padEnd(32,'0').slice(0,32));
-        // In reuse mode, we always use same r (simulated by same key+same msg)
-      } else {
-        enc = await api.enc.cpa(key, msg.padEnd(32,'0').slice(0,32));
-      }
-      // Student guesses randomly
-      const guess = Math.random() < 0.5 ? 0 : 1;
-      const correct = guess === b;
-      const newRound = { b, guess, correct, ct: enc.ciphertext?.slice(0,16)+'…', r: enc.r?.slice(0,8)+'…' };
-      setRounds(prev => {
-        const next = [...prev, newRound].slice(-20);
-        const wins = next.filter(r=>r.correct).length;
-        setAdvantage(Math.abs(wins/next.length - 0.5));
-        return next;
-      });
+      const enc = await api.enc.cpa(key, msg.padEnd(32,'0').slice(0,32));
+      setPendingRound({ b, ct: enc.ciphertext, r: enc.r });
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
+  };
+
+  const submitGuess = (guess) => {
+    if (!pendingRound) return;
+    const { b, ct, r } = pendingRound;
+    const correct = guess === b;
+    const newRound = { b, guess, correct, ct: ct?.slice(0,16)+'…', r: r?.slice(0,8)+'…' };
+    setRounds(prev => {
+      const next = [...prev, newRound].slice(-20);
+      const wins = next.filter(rd=>rd.correct).length;
+      setAdvantage(Math.abs(wins/next.length - 0.5));
+      return next;
+    });
+    setPendingRound(null);
   };
 
   const advColor = advantage < 0.1 ? 'var(--accent-green)' : 'var(--accent-red)';
@@ -50,6 +50,7 @@ export default function PA3Demo() {
     setAdvantage(0);
     setReuse(false);
     setError(null);
+    setPendingRound(null);
   };
 
   return (
@@ -61,33 +62,44 @@ export default function PA3Demo() {
           In secure mode, your advantage should converge to ≈0.
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <HexInput
-            label="Message m₀ (hex)"
-            value={m0}
-            onChange={setM0}
-            onEnter={playRound}
-            disabled={loading}
-          />
-          <HexInput
-            label="Message m₁ (hex, same length)"
-            value={m1}
-            onChange={setM1}
-            onEnter={playRound}
-            disabled={loading}
-          />
+          <HexInput label="Message m₀ (hex)" value={m0} onChange={setM0} disabled={loading || !!pendingRound} />
+          <HexInput label="Message m₁ (hex, same length)" value={m1} onChange={setM1} disabled={loading || !!pendingRound} />
         </div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
-          <button className="btn btn-primary" onClick={playRound} disabled={loading}>
-            {loading ? 'Encrypting…' : 'Encrypt (Challenger picks b)'}
-          </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-            <input type="checkbox" checked={reuse} onChange={e=>setReuse(e.target.checked)} />
+            <input type="checkbox" checked={reuse} onChange={e=>setReuse(e.target.checked)} disabled={!!pendingRound} />
             <span>Reuse nonce (BROKEN mode)</span>
           </label>
           {reuse && <span className="badge badge-broken">⚠ BROKEN</span>}
           {!reuse && <span className="badge badge-secure">✓ SECURE</span>}
         </div>
-        <div className="form-group">
+
+        {!pendingRound ? (
+          <button className="btn btn-primary" onClick={requestChallenge} disabled={loading || m0.length !== m1.length}>
+            {'Encrypt (Challenger picks b)'}
+          </button>
+        ) : (
+          <div style={{ background: 'var(--bg-well)', borderRadius: 8, padding: 14, marginBottom: 8, border: '1px solid var(--border)' }}>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 10 }}>
+              <div>Challenger sent ciphertext (r, c):</div>
+              <div style={{ fontFamily: 'var(--font-mono)', marginTop: 4 }}>
+                r = {pendingRound.r?.slice(0,16)}… &nbsp;&nbsp; ct = {pendingRound.ct?.slice(0,16)}…
+              </div>
+              {reuse && (
+                <div style={{ marginTop: 8, color: 'var(--accent-red)', fontSize: '0.74rem' }}>
+                  ⚠ Reuse-nonce mode: same key + same nonce ⇒ same keystream. ct XOR m₀ or m₁ reveals b directly — advantage = 1.
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Your guess — was this m</span>
+              <button className="btn btn-primary" style={{ minWidth: 56 }} onClick={() => submitGuess(0)}>m₀</button>
+              <button className="btn btn-primary" style={{ minWidth: 56 }} onClick={() => submitGuess(1)}>m₁</button>
+            </div>
+          </div>
+        )}
+
+        <div className="form-group" style={{ marginTop: 14 }}>
           <label>Adversary Advantage: {(advantage*100).toFixed(1)}% (target ≤10%)</label>
           <div className="advantage-bar">
             <div className="advantage-fill" style={{ width: `${Math.min(advantage*200, 100)}%`, background: advColor }} />
@@ -103,7 +115,7 @@ export default function PA3Demo() {
           </div>
         )}
         <div style={{ marginTop: 10, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-          Rounds played: {rounds.length}/20 | Advantage: {(advantage).toFixed(3)}
+          Rounds played: {rounds.length}/20 | Advantage: {advantage.toFixed(3)}
         </div>
         {error && <div className="hex-display red" style={{ marginTop: 8 }}>Error: {error}</div>}
       </div>

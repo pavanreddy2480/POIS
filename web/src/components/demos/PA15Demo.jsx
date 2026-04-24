@@ -10,7 +10,6 @@ export default function PA15Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await post('/sig/demo', {
         message: msg,
@@ -52,7 +51,7 @@ export default function PA15Demo() {
           </label>
         </div>
         <button className="btn btn-primary" onClick={run} disabled={loading}>
-          {loading ? 'Working…' : 'Sign & Verify'}
+          {'Sign & Verify'}
         </button>
 
         {result && !result.error && (

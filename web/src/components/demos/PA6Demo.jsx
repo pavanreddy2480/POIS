@@ -6,7 +6,7 @@ import DemoHeader from '../DemoHeader';
 const KE = '0123456789abcdef0123456789abcdef';
 const KM = 'fedcba9876543210fedcba9876543210';
 
-export default function PA6Demo() {
+export default function PA6Demo({ onNavigate }) {
   const [msg, setMsg] = useState('deadbeef00112233');
   const [cpa, setCpa] = useState(null);
   const [cca, setCca] = useState(null);
@@ -72,7 +72,7 @@ export default function PA6Demo() {
           disabled={loading}
         />
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-          <button className="btn btn-primary" onClick={encrypt} disabled={loading}>{loading ? 'Encrypting…' : 'Encrypt Both'}</button>
+          <button className="btn btn-primary" onClick={encrypt} disabled={loading}>{'Encrypt Both'}</button>
           <span style={{ fontSize: '0.8rem', alignSelf: 'center', color: 'var(--text-secondary)' }}>
             Bit to flip: <input type="number" value={flipBit} onChange={e=>setFlipBit(+e.target.value)} style={{ width: 60, display: 'inline' }} />
           </span>
@@ -81,17 +81,23 @@ export default function PA6Demo() {
           <div className="demo-half broken">
             <h5>⚠ CPA-Only (malleable)</h5>
             {cpa && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cpa.ciphertext?.slice(0,32)}…</div>}
-            <button className="btn btn-danger" onClick={()=>flipAndDecrypt('cpa')} disabled={!cpa || loading}>{loading ? 'Decrypting…' : 'Flip bit & Decrypt'}</button>
+            <button className="btn btn-danger" onClick={()=>flipAndDecrypt('cpa')} disabled={!cpa || loading}>{'Flip bit & Decrypt'}</button>
             {cpa?.flippedDec && <div style={{ marginTop: 8 }}><div className="hex-display red">Corrupted PT: {cpa.flippedDec}</div><span className="badge badge-broken" style={{ marginTop: 6 }}>Malleability demonstrated!</span></div>}
           </div>
           <div className="demo-half secure">
             <h5>✓ CCA / Encrypt-then-MAC</h5>
             {cca && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cca.ciphertext?.slice(0,32)}… | Tag: {cca.tag?.slice(0,16)}…</div>}
-            <button className="btn btn-success" onClick={()=>flipAndDecrypt('cca')} disabled={!cca || loading}>{loading ? 'Checking…' : 'Flip bit & Try Decrypt'}</button>
+            <button className="btn btn-success" onClick={()=>flipAndDecrypt('cca')} disabled={!cca || loading}>{'Flip bit & Try Decrypt'}</button>
             {cca?.rejected && <div style={{ marginTop: 8 }}><div className="hex-display blue">Result: ⊥ (MAC verification failed)</div><span className="badge badge-secure" style={{ marginTop: 6 }}>CCA attack rejected!</span></div>}
           </div>
         </div>
         {error && <div className="hex-display red" style={{ marginTop: 8 }}>Error: {error}</div>}
+        {onNavigate && (
+          <div className="demo-related">
+            <span className="demo-related-label">Related:</span>
+            <button className="demo-xlink" onClick={() => onNavigate('PA3')}>PA3 IND-CPA Enc →</button>
+          </div>
+        )}
       </div>
     </div>
   );

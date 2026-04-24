@@ -9,7 +9,6 @@ export default function PA13Demo() {
 
   async function run() {
     setLoading(true);
-    setResult(null);
     try {
       const r = await api.millerRabin.test(parseInt(n), k);
       setResult(r);
@@ -64,7 +63,7 @@ export default function PA13Demo() {
         </div>
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <button className="btn btn-primary" onClick={run} disabled={loading}>
-            {loading ? 'Testing…' : 'Test Primality'}
+            {'Test Primality'}
           </button>
           <button className="btn btn-secondary" onClick={genPrime} disabled={loading}>
             Gen 32-bit Prime

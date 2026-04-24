@@ -53,7 +53,7 @@ export default function PA8Demo() {
           />
         </div>
         <button className="btn btn-primary" onClick={run} disabled={loading} style={{ marginBottom: 10 }}>
-          {loading ? 'Computing…' : '▶ Compute DLP_Hash'}
+          {'▶ Compute DLP_Hash'}
         </button>
         {result && !result.error && (
           <div className="form-group">
@@ -82,6 +82,20 @@ export default function PA8Demo() {
             </>}
             <div><span className="result-key">Evaluations: </span><span className="result-val">{birthday.evaluations} (expected ≈{birthday.expected_2_to_n_over_2})</span></div>
             {birthday.ratio && <div><span className="result-key">Ratio: </span><span className="result-val">{birthday.ratio?.toFixed(2)}× expected</span></div>}
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>
+                Progress vs 2^(n/2) = {birthday.expected_2_to_n_over_2} evaluations
+              </div>
+              <div className="advantage-bar">
+                <div className="advantage-fill" style={{
+                  width: `${Math.min((birthday.evaluations / birthday.expected_2_to_n_over_2) * 50, 100)}%`,
+                  background: (birthday.ratio ?? 1) <= 1.5 ? 'var(--accent-green)' : 'var(--accent-orange)',
+                }} />
+              </div>
+              <div style={{ fontSize: '0.73rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                {birthday.evaluations} / {birthday.expected_2_to_n_over_2} ({((birthday.evaluations / birthday.expected_2_to_n_over_2) * 100).toFixed(0)}% of 2^(n/2))
+              </div>
+            </div>
           </div>
         )}
       </div>
