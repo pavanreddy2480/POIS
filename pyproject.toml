@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "minicrypt-clique-explorer"
+version = "1.0.0"
+description = "From-scratch implementation of the Minicrypt Clique — OWF through 2-Party MPC"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+python_files = ["tests.py", "test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
