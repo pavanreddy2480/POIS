@@ -15,8 +15,8 @@ import ReducePanel from './components/ReducePanel';
 import ProofPanel from './components/ProofPanel';
 import DemoSection from './components/DemoSection';
 
-const PRIMITIVES = ['OWF', 'PRG', 'PRF', 'PRP', 'MAC', 'CRHF', 'HMAC'];
-const PA_NUMS = { OWF: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10 };
+const PRIMITIVES = ['OWF', 'OWP', 'PRG', 'PRF', 'PRP', 'MAC', 'CRHF', 'HMAC', 'CPA_ENC', 'CCA_ENC'];
+const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
 
 export default function App() {
   const [foundation, setFoundation] = useState('AES');
@@ -91,6 +91,17 @@ export default function App() {
             steps1.push({ label: 'F_k(0)', fn: 'PRF basis', value: r0.output, desc: 'Foundation for HMAC' });
             const rh = await api.hmac.sign(k16, qShort);
             steps1.push({ label: 'HMAC_k(m)', fn: 'H(k⊕opad‖H(k⊕ipad‖m))', value: rh.tag, desc: 'HMAC over PA#8 DLP hash' });
+          } else if (source === 'OWP') {
+            steps1.push({ label: 'AES_k(m)', fn: 'AES-128 PRP', value: r0.output, desc: 'AES is a PRP — a bijection on {0,1}¹²⁸, i.e. a one-way permutation' });
+          } else if (source === 'CPA_ENC') {
+            const rcpa = await api.enc.cpa(k32, qPad.slice(0, 32));
+            steps1.push({ label: 'r (nonce)', fn: 'random', value: rcpa.r, desc: 'Random nonce r ← {0,1}ⁿ' });
+            steps1.push({ label: 'CPA_Enc_k(m)', fn: 'F_k(r) ⊕ m', value: rcpa.ciphertext, desc: 'PRF → CPA: ciphertext = F_k(r) ⊕ m' });
+          } else if (source === 'CCA_ENC') {
+            const rcca = await api.cca.encrypt(k16, k16, qPad.slice(0, 32));
+            steps1.push({ label: 'r', fn: 'CPA nonce', value: rcca.r, desc: 'CPA inner layer: r ← {0,1}ⁿ' });
+            steps1.push({ label: 'c', fn: 'CPA_Enc_kE(m)', value: rcca.ciphertext, desc: 'CPA ciphertext' });
+            steps1.push({ label: 't', fn: 'MAC_kM(r‖c)', value: rcca.tag, desc: 'Encrypt-then-MAC integrity tag → IND-CCA2' });
           }
         } catch (e) { steps1.push({ label: 'Error', fn: source, value: e.message, stub: true }); }
       } else {
@@ -111,6 +122,14 @@ export default function App() {
           } else if (source === 'HMAC') {
             const rh = await api.hmac.sign(k16, qShort);
             steps1.push({ label: 'HMAC_k(m)', fn: 'DLP hash in HMAC', value: rh.tag, desc: 'HMAC over DLP hash (PA#10)' });
+          } else if (source === 'OWP') {
+            steps1.push({ label: 'OWP(x) = g^x mod p', fn: 'DLP OWP', value: owfOut, desc: 'g^x mod p is bijective on Z_q — directly a one-way permutation' });
+          } else if (source === 'CPA_ENC') {
+            steps1.push({ label: 'DLP OWF', fn: 'g^x mod p', value: owfOut, desc: 'Foundation: DLP OWF' });
+            steps1.push({ label: 'OWF → PRG → PRF → CPA', fn: 'multi-hop chain', value: '(HILL + GGM + nonce-enc)', stub: true, desc: 'DLP OWF → HILL PRG → GGM PRF → CPA encryption' });
+          } else if (source === 'CCA_ENC') {
+            steps1.push({ label: 'DLP OWF', fn: 'g^x mod p', value: owfOut, desc: 'Foundation: DLP OWF' });
+            steps1.push({ label: 'OWF → … → CCA', fn: 'multi-hop chain', value: '(HILL + GGM + EtM)', stub: true, desc: 'DLP OWF → HILL PRG → GGM PRF → CPA → Encrypt-then-MAC → IND-CCA2' });
           } else if (source !== 'OWF') {
             steps1.push({ label: source, fn: 'via OWF chain', value: '(multi-hop from DLP)', desc: `${source} built from DLP OWF via reduction chain` });
           }
@@ -210,6 +229,40 @@ export default function App() {
           const seedH = (queryHex || '').slice(0, 8).padEnd(8, '0');
           const rp = await api.prg.generate(seedH, 32);
           steps2.push({ label: 'G(s)', fn: 'PRG output', value: rp.output_hex, desc: 'PRG is one-way: recovering s from G(s) breaks pseudorandomness' });
+
+        } else if (srcN === 'OWP' && tgtN === 'OWF') {
+          const r = await api.owf.evaluate(qShort.padEnd(16, '0'));
+          const owfOut = r.output.replace(/^0x/, '');
+          steps2.push({ label: 'OWP(x) = g^x mod p', fn: 'DLP OWP', value: owfOut, desc: 'OWP is bijective on Z_q — already a one-way function by definition' });
+          steps2.push({ label: 'OWF(x)', fn: 'OWP ⊆ OWF', value: owfOut, desc: 'Any OWP inverter is an OWF inverter: same function, same hardness' });
+
+        } else if (srcN === 'CPA_ENC' && tgtN === 'PRF') {
+          const rcpa = await api.enc.cpa(k32, qPad.slice(0, 32));
+          steps2.push({ label: 'r', fn: 'CPA nonce', value: rcpa.r, desc: 'Nonce r chosen uniformly at random' });
+          steps2.push({ label: 'c = F_k(r) ⊕ m', fn: 'CPA ciphertext', value: rcpa.ciphertext, desc: 'IND-CPA adversary distinguishes c from uniform → PRF distinguisher' });
+          steps2.push({ label: 'PRF break', fn: 'dist(F_k(r), U)', value: `adv ≥ ε_CPA − q²/2ⁿ`, stub: true, desc: 'CPA distinguisher feeds queries to PRF oracle and detects non-randomness' });
+
+        } else if (srcN === 'CCA_ENC' && tgtN === 'CPA_ENC') {
+          const rcca = await api.cca.encrypt(k16, k16, qPad.slice(0, 32));
+          steps2.push({ label: 'r', fn: 'inner CPA nonce', value: rcca.r, desc: 'CPA layer nonce inside CCA scheme' });
+          steps2.push({ label: 'c', fn: 'CPA_Enc_kE(m)', value: rcca.ciphertext, desc: 'CPA ciphertext — IND-CCA2 ⊃ IND-CPA: dropping MAC reveals CPA layer' });
+          steps2.push({ label: 't', fn: 'MAC_kM(r‖c)', value: rcca.tag, desc: 'CCA adversary (who has dec oracle) simulates CPA game with equal advantage' });
+
+        } else if (srcN === 'CRHF' && tgtN === 'PRF') {
+          const rmd = await api.hash.md(qShort);
+          const chain = rmd?.chain || [];
+          chain.forEach((entry, i) => {
+            if (i === 0) steps2.push({ label: 'IV = 0ⁿ', fn: 'init', value: entry[1], desc: 'Merkle-Damgård start' });
+            else steps2.push({ label: `z${i}`, fn: `h(z${i-1},M${i})`, value: entry[2] || entry[1], desc: `Compress block ${i}` });
+          });
+          steps2.push({ label: 'collision ⇒ PRF break', fn: 'h(cv,b₁)=h(cv,b₂)', value: rmd.digest, stub: true, desc: 'CRHF collision in compression function h implies PRF distinguisher for h' });
+
+        } else if (srcN === 'MAC' && tgtN === 'PRP') {
+          const rm = await api.mac.sign(k32, qPad.slice(0, 32));
+          const rp = await api.prf.evaluate(k32, qPad.slice(0, 32));
+          steps2.push({ label: 'MAC_k(m)', fn: 'CBC-MAC tag', value: rm.tag, desc: 'CBC-MAC uses AES (PRP) as its block cipher' });
+          steps2.push({ label: 'PRP_k(m)', fn: 'AES eval', value: rp.output, desc: 'Underlying PRP — MAC forgery implies PRP distinguisher' });
+          steps2.push({ label: 'PRP break', fn: 'MAC-forge ⇒ PRP-dist', value: `adv ≥ ε_MAC`, stub: true, desc: 'EUF-CMA MAC forger distinguishes PRP from random permutation' });
 
         } else {
           // Multi-hop or unsupported: show routing steps with final computation

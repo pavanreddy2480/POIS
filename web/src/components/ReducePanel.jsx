@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const PA_NUMS = { OWF: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10 };
+const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
 
 export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, onRun }) {
   const [busy, setBusy] = useState(false);

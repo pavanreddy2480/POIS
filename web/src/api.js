@@ -23,7 +23,7 @@ export const api = {
   owf: { evaluate: (value) => post('/owf/evaluate', { value }) },
   prg: { generate: (seed_hex, length) => post('/prg/generate', { seed_hex, length }) },
   prf: {
-    evaluate: (key_hex, input_hex) => post('/prf/evaluate', { key_hex, input_hex }),
+    evaluate: (key_hex, input_hex, depth, prf_type) => post('/prf/evaluate', { key_hex, input_hex, depth, prf_type }),
     ggm_tree: (key_hex, input_hex, depth) => post('/prf/ggm_tree', { key_hex, input_hex, depth }),
   },
   enc: {

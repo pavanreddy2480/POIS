@@ -12,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List, Any
+from src.pa02_prf.prf import GGMPRF, AESPRF
 
 app = FastAPI(title="CS8.401 POIS — Minicrypt Clique API", version="1.0.0")
 
@@ -101,6 +102,7 @@ class PRFRequest(BaseModel):
     key_hex: str
     input_hex: str
     depth: int = 8
+    prf_type: str = "GGM"
 
 class EncRequest(BaseModel):
     key_hex: str
@@ -276,7 +278,10 @@ def prf_evaluate(req: PRFRequest):
     try:
         k = bytes.fromhex(req.key_hex)
         x = bytes.fromhex(req.input_hex)
-        prf = get_aes_prf()
+        if req.prf_type.upper() == "AES":
+            prf = get_aes_prf()
+        else:
+            prf = GGMPRF(depth=req.depth)
         out = prf.F(k, x)
         return {"key": req.key_hex, "input": req.input_hex, "output": out.hex()}
     except Exception as e:
@@ -287,7 +292,7 @@ def prf_ggm_tree(req: PRFRequest):
     try:
         k = bytes.fromhex(req.key_hex)
         x = bytes.fromhex(req.input_hex)
-        prf = get_ggm_prf()
+        prf = GGMPRF(depth=req.depth)
         path = prf.get_tree_path(k, x)
         return {
             "key": req.key_hex,
@@ -1147,6 +1152,48 @@ ROUTING_TABLE = {
         "pa": "PA#10",
         "direction": "backward",
         "security_claim": "HMAC generalizes PRF-MAC for arbitrary-length messages",
+    },
+    ("OWP", "OWF"): {
+        "steps": ["OWP → OWF: a one-way permutation is a one-way function (bijective → hard to invert)"],
+        "theorem": "OWP ⊆ OWF",
+        "pa": "PA#1",
+        "direction": "backward",
+        "security_claim": "Any OWF-inverter immediately inverts the OWP; OWP security is a special case of OWF security",
+    },
+    ("CPA_ENC", "PRF"): {
+        "steps": ["CPA_ENC → PRF: distinguishing ciphertexts F_k(r)⊕m from uniform implies a PRF distinguisher"],
+        "theorem": "IND-CPA ⇒ PRF Security (contrapositive)",
+        "pa": "PA#3",
+        "direction": "backward",
+        "security_claim": "A PRF adversary with advantage ε gives an IND-CPA adversary with advantage ε - q²/2^n",
+    },
+    ("CCA_ENC", "CPA_ENC"): {
+        "steps": ["CCA_ENC → CPA_ENC: IND-CCA2 is strictly stronger than IND-CPA; any CCA-secure scheme is CPA-secure"],
+        "theorem": "IND-CCA2 ⇒ IND-CPA",
+        "pa": "PA#6",
+        "direction": "backward",
+        "security_claim": "CCA adversary can simulate CPA game; breaking IND-CPA gives a CCA2 adversary with equal advantage",
+    },
+    ("CRHF", "PRF"): {
+        "steps": ["CRHF → PRF: a CRHF collision in the MD compression function yields a PRF distinguisher"],
+        "theorem": "CRHF Collision ⇒ PRF Break",
+        "pa": "PA#7",
+        "direction": "backward",
+        "security_claim": "If compression function PRF is broken, its outputs can be distinguished from random, producing CRHF collisions via birthday attack",
+    },
+    ("CRHF", "DLP"): {
+        "steps": ["CRHF → DLP: collision h(x1,y1)=h(x2,y2) in DLP hash g^x·h^y mod p solves discrete log α=(x1-x2)/(y2-y1) mod q"],
+        "theorem": "DLP-Hash Collision ⇒ DLP Solution",
+        "pa": "PA#8",
+        "direction": "backward",
+        "security_claim": "Any collision-finder for the DLP hash is immediately a DLP solver; CRHF security reduces to DLP hardness",
+    },
+    ("MAC", "PRP"): {
+        "steps": ["MAC → PRP: CBC-MAC forgery implies a PRP distinguisher for the underlying block cipher"],
+        "theorem": "CBC-MAC Forgery ⇒ PRP Break",
+        "pa": "PA#5",
+        "direction": "backward",
+        "security_claim": "If the block cipher (PRP) is broken, CBC-MAC tags can be forged; EUF-CMA security of CBC-MAC reduces to PRP security",
     },
     # ── Multi-hop paths ───────────────────────────────────────────────────
     ("OWF", "PRF"): {
