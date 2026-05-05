@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 import DemoHeader from '../DemoHeader';
 
 const MODES = ['CBC', 'OFB', 'CTR'];
 const MSG_DEFAULT = '48656c6c6f20576f726c642120426c6f636b';
-const MSG2_DEFAULT = '576f726c64212042524f4b454e21212121';
+const MSG2_DEFAULT = '48656c6c6f20576f726c642120426c6f4841434b4544';
 
 function Box({ label, sub, value, color, style }) {
   return (
@@ -153,6 +153,16 @@ export default function PA4Demo() {
     return padded.length % 2 ? padded + '0' : padded;
   };
 
+  const hexXor = (a, b) => {
+    const len = Math.min(a.length, b.length);
+    let out = '';
+    for (let i = 0; i < len; i += 2) {
+      out += ((parseInt(a.slice(i, i+2), 16) ^ parseInt(b.slice(i, i+2), 16))
+        .toString(16).padStart(2, '0'));
+    }
+    return out;
+  };
+
   const run = async (overrideMode) => {
     const m = overrideMode || mode;
     setLoading(true);
@@ -167,12 +177,20 @@ export default function PA4Demo() {
         const r2 = await api.modes.encryptBlocks('CBC', key, alignHex(msg2), r1.iv);
         setResult2(r2);
       }
+      if (reuseIV && m === 'OFB') {
+        const iv = r1.iv;
+        const r2 = await api.modes.encryptBlocks('OFB', key, alignHex(msg2), iv);
+        setResult2({ ...r2, xorResult: hexXor(r1.ciphertext, r2.ciphertext) });
+      }
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
+  useEffect(() => { run(); }, []);
+
   const switchMode = (newMode) => {
     setMode(newMode);
+    setResult(null);
     setResult2(null);
     setFlipResult(null);
     setFlippedBlock(null);
@@ -232,7 +250,7 @@ export default function PA4Demo() {
           </button>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.82rem', cursor: 'pointer' }}>
             <input type="checkbox" checked={reuseIV} onChange={e => setReuseIV(e.target.checked)} />
-            Reuse IV (CBC — broken)
+            {mode === 'OFB' ? 'Reuse IV (OFB — keystream reuse)' : mode === 'CTR' ? 'Reuse IV (CTR — broken)' : 'Reuse IV (CBC — broken)'}
           </label>
           {reuseIV && <span className="badge badge-broken">⚠ BROKEN</span>}
         </div>
@@ -294,6 +312,40 @@ export default function PA4Demo() {
                   <div style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--accent-red)' }}>
                     ⚠ Block{matchingBlocks.length > 1 ? 's' : ''} {matchingBlocks.map(i => i+1).join(', ')} have identical ciphertexts
                     — IV reuse reveals which plaintext blocks match between messages!
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {reuseIV && mode === 'OFB' && (
+          <div style={{ marginBottom: 14 }}>
+            <div className="form-group">
+              <label>Message 2 (hex) — encrypted with same IV (OFB keystream reuse)</label>
+              <input type="text" value={msg2} onChange={e => { setMsg2(e.target.value); setResult2(null); }}
+                onKeyDown={e => e.key === 'Enter' && !loading && run()} />
+            </div>
+            {result2 && (
+              <div style={{ background: 'var(--bg-well)', borderRadius: 8, padding: 12, border: '1px solid var(--accent-red)' }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', fontWeight: 700, marginBottom: 6 }}>
+                  ⚡ OFB Keystream Reuse Attack
+                </div>
+                <BlockChain mode="OFB" result={result2} onFlip={null} flipResult={null} matchingBlocks={[]} />
+                {result2.xorResult && (
+                  <div style={{ marginTop: 10, padding: 10, background: 'rgba(231,76,60,0.06)',
+                    border: '1px solid rgba(231,76,60,0.25)', borderRadius: 6 }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 4, fontWeight: 600 }}>
+                      C₁ ⊕ C₂ = M₁ ⊕ M₂ (plaintext XOR recovered without the key)
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', wordBreak: 'break-all',
+                      color: 'var(--accent-red)' }}>
+                      {result2.xorResult}
+                    </div>
+                    <div style={{ marginTop: 6, fontSize: '0.7rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                      Both messages share the same keystream (same IV → same OFB state). XOR cancels the keystream:
+                      (M₁ ⊕ ks) ⊕ (M₂ ⊕ ks) = M₁ ⊕ M₂. An attacker who knows M₁ recovers M₂ entirely.
+                    </div>
                   </div>
                 )}
               </div>

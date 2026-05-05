@@ -107,6 +107,7 @@ class PRFRequest(BaseModel):
 class EncRequest(BaseModel):
     key_hex: str
     message_hex: str
+    broken_nonce: bool = False
 
 class DecRequest(BaseModel):
     key_hex: str
@@ -135,16 +136,25 @@ class FlipBitRequest(BaseModel):
 class MACRequest(BaseModel):
     key_hex: str
     message_hex: str
+    mac_type: str = "PRF"
 
 class MACVerifyRequest(BaseModel):
     key_hex: str
     message_hex: str
     tag_hex: str
+    mac_type: str = "PRF"
 
 class CCAEncRequest(BaseModel):
     ke_hex: str
     km_hex: str
     message_hex: str
+
+class CCADecRequest(BaseModel):
+    ke_hex: str
+    km_hex: str
+    r_hex: str
+    ciphertext_hex: str
+    tag_hex: str
 
 class HashRequest(BaseModel):
     message_hex: str
@@ -312,7 +322,10 @@ def cpa_encrypt(req: EncRequest):
         k = bytes.fromhex(req.key_hex)
         m = bytes.fromhex(req.message_hex)
         enc = get_cpa_enc()
-        r, c = enc.enc(k, m)
+        if req.broken_nonce:
+            r, c = enc.enc_broken(k, m)
+        else:
+            r, c = enc.enc(k, m)
         return {"key": req.key_hex, "message": req.message_hex,
                 "r": r.hex(), "ciphertext": c.hex()}
     except Exception as e:
@@ -476,23 +489,23 @@ def modes_flip_and_decrypt(req: FlipBitRequest):
 @app.post("/api/mac/sign")
 def mac_sign(req: MACRequest):
     try:
-        from src.pa05_mac.mac import PRFMAC
+        from src.pa05_mac.mac import PRFMAC, CBCMAC
         k = bytes.fromhex(req.key_hex)
         m = bytes.fromhex(req.message_hex)
-        mac = PRFMAC(get_aes_prf())
+        mac = CBCMAC() if req.mac_type.upper() == "CBC" else PRFMAC(get_aes_prf())
         t = mac.mac(k, m)
-        return {"tag": t.hex()}
+        return {"tag": t.hex(), "mac_type": req.mac_type.upper()}
     except Exception as e:
         raise HTTPException(400, str(e))
 
 @app.post("/api/mac/verify")
 def mac_verify(req: MACVerifyRequest):
     try:
-        from src.pa05_mac.mac import PRFMAC
+        from src.pa05_mac.mac import PRFMAC, CBCMAC
         k = bytes.fromhex(req.key_hex)
         m = bytes.fromhex(req.message_hex)
         t = bytes.fromhex(req.tag_hex)
-        mac = PRFMAC(get_aes_prf())
+        mac = CBCMAC() if req.mac_type.upper() == "CBC" else PRFMAC(get_aes_prf())
         valid = mac.vrfy(k, m, t)
         return {"valid": valid}
     except Exception as e:
@@ -515,19 +528,100 @@ def cca_encrypt(req: CCAEncRequest):
     except Exception as e:
         raise HTTPException(400, str(e))
 
+@app.post("/api/cca/decrypt")
+def cca_decrypt(req: CCADecRequest):
+    try:
+        from src.pa06_cca_enc.cca_enc import CCAEnc
+        from src.pa05_mac.mac import PRFMAC
+        kE = bytes.fromhex(req.ke_hex)
+        kM = bytes.fromhex(req.km_hex)
+        r = bytes.fromhex(req.r_hex)
+        c = bytes.fromhex(req.ciphertext_hex)
+        t = bytes.fromhex(req.tag_hex)
+        cca = CCAEnc(get_cpa_enc(), PRFMAC(get_aes_prf()))
+        pt = cca.cca_dec(kE, kM, r, c, t)
+        if pt is None:
+            return {"valid": False, "plaintext": None}
+        return {"valid": True, "plaintext": pt.hex()}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
 
 # ── PA#7 Merkle-Damgård ───────────────────────────────────────────────────────
 
 @app.post("/api/hash/merkle_damgard")
 def md_hash(req: HashRequest):
+    """Hash a message using the toy XOR compression + MD construction."""
     try:
-        from src.pa07_merkle_damgard.merkle_damgard import MerkleDamgard
+        from src.pa07_merkle_damgard.merkle_damgard import MerkleDamgard, toy_compress
         msg = bytes.fromhex(req.message_hex)
-        def toy_compress(state: bytes, block: bytes) -> bytes:
-            return bytes(a ^ b for a, b in zip(state, block[:len(state)]))
-        md = MerkleDamgard(toy_compress, b'\x00'*4, 8)
+        md = MerkleDamgard(toy_compress, b'\x00' * 4, 8)
         result = md.hash_with_chain(msg)
         return result
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hash/md_boundary")
+def md_boundary():
+    """
+    Run boundary-case tests: empty message, short, single-block, multi-block.
+    Verifies MD framework produces correct-length outputs for all edge cases.
+    """
+    try:
+        from src.pa07_merkle_damgard.merkle_damgard import MerkleDamgard, toy_compress
+        md = MerkleDamgard(toy_compress, b'\x00' * 4, 8)
+        results = md.boundary_tests()
+        return {"results": results, "block_size": md.block_size, "state_size": len(md.IV)}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hash/collision_demo")
+def md_collision_demo():
+    """
+    Demonstrate collision propagation in Merkle-Damgård.
+    toy_compress(state, block) = state XOR block[:4] — ignores block[4:8].
+    Two blocks sharing the same first 4 bytes always collide in h, and that
+    collision propagates through the full MD chain (illustrates the reduction).
+    """
+    try:
+        from src.pa07_merkle_damgard.merkle_damgard import (
+            MerkleDamgard, toy_compress, toy_collision_pair,
+        )
+        md = MerkleDamgard(toy_compress, b'\x00' * 4, 8)
+        IV = md.IV
+
+        # Get colliding pair with full chains
+        cp = toy_collision_pair()
+
+        # Single-block compression demo
+        single_A = bytes([0xCA, 0xFE, 0xBA, 0xBE, 0x00, 0x00, 0x00, 0x00])
+        single_B = bytes([0xCA, 0xFE, 0xBA, 0xBE, 0xFF, 0xFF, 0xFF, 0xFF])
+        compress_A = toy_compress(IV, single_A)
+        compress_B = toy_compress(IV, single_B)
+
+        return {
+            "iv": IV.hex(),
+            "msg_A": cp["msg_A"],
+            "msg_B": cp["msg_B"],
+            "chain_A": cp["chain_A"],
+            "chain_B": cp["chain_B"],
+            "digest_A": cp["digest_A"],
+            "digest_B": cp["digest_B"],
+            "collision": cp["collision"],
+            "single_block_A": single_A.hex(),
+            "single_block_B": single_B.hex(),
+            "compress_A": compress_A.hex(),
+            "compress_B": compress_B.hex(),
+            "single_collision": compress_A == compress_B,
+            "explanation": (
+                "toy_compress(state, block) = state XOR block[0:4] — "
+                "it ignores block[4:8]. Any two blocks with the same first 4 bytes "
+                "produce the same output. This compression-function collision propagates "
+                "through the entire MD chain, yielding equal final digests."
+            ),
+        }
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -540,7 +634,85 @@ def dlp_hash(req: HashRequest):
         msg = bytes.fromhex(req.message_hex)
         H = get_dlp_hash()
         digest = H.hash(msg)
-        return {"message": req.message_hex, "digest": digest.hex()}
+        grp = H.group.params()
+        return {
+            "message": req.message_hex,
+            "digest": digest.hex(),
+            "group": grp,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hash/dlp_params")
+def dlp_params():
+    """Return the DLP group parameters used by the hash function."""
+    try:
+        H = get_dlp_hash()
+        grp = H.group.params()
+        grp["iv"] = H.IV.hex()
+        grp["block_size"] = H.block_size
+        grp["description"] = (
+            "Safe-prime subgroup of Z*_p.  p = 2q+1 (Sophie Germain prime). "
+            "g is a generator of the order-q subgroup.  "
+            "h = g^alpha mod p where alpha was randomly chosen then discarded. "
+            "DLP compression: f(x,y) = g^x * h^y mod p."
+        )
+        return grp
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hash/dlp_integration")
+def dlp_integration():
+    """Hash five messages of different lengths and verify distinct digests."""
+    try:
+        H = get_dlp_hash()
+        test_messages = [
+            ("empty",          b""),
+            ("1 byte",         b"a"),
+            ("5 bytes",        b"Hello"),
+            ("15 bytes",       b"Hello DLP Hash!"),
+            ("44 bytes",       b"The quick brown fox jumps over the lazy dog"),
+        ]
+        results = []
+        seen = set()
+        for label, msg in test_messages:
+            digest = H.hash(msg)
+            d_hex = digest.hex()
+            results.append({
+                "label": label,
+                "message": msg.decode("ascii", errors="replace"),
+                "message_hex": msg.hex(),
+                "length_bytes": len(msg),
+                "digest": d_hex,
+                "duplicate": d_hex in seen,
+            })
+            seen.add(d_hex)
+        all_distinct = len(seen) == len(test_messages)
+        return {
+            "results": results,
+            "all_distinct": all_distinct,
+            "test_count": len(test_messages),
+            "pass": all_distinct,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hash/dlp_collision_demo")
+def dlp_collision_demo():
+    """
+    Demonstrate collision resistance via DLP hardness.
+    Shows:
+    1) How to produce a collision when alpha IS known (setup knowledge).
+    2) The algebraic argument that any collision finder solves DLP.
+    3) Brute-force collision finder on tiny toy group (q≈2^16).
+    """
+    try:
+        from src.pa08_dlp_hash.dlp_hash import collision_resistance_demo
+        demo = collision_resistance_demo()
+        return demo
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -548,23 +720,92 @@ def dlp_hash(req: HashRequest):
 # ── PA#9 Birthday Attack ──────────────────────────────────────────────────────
 
 @app.post("/api/birthday/attack")
-def birthday_attack(req: BirthdayRequest):
+def birthday_attack_endpoint(req: BirthdayRequest):
+    """Naive birthday attack on the DLP hash truncated to n bits."""
     try:
         from src.pa09_birthday_attack.birthday_attack import birthday_attack_naive
         H = get_dlp_hash()
         def hash_fn(b: bytes) -> int:
             d = H.hash(b)
             return int.from_bytes(d, 'big')
-        result = birthday_attack_naive(hash_fn, req.n_bits)
-        return result
+        return birthday_attack_naive(hash_fn, req.n_bits)
     except Exception as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/api/birthday/floyd")
+def birthday_floyd_endpoint(req: BirthdayRequest):
+    """Floyd cycle-detection attack on the DLP hash (space-efficient, O(1) memory)."""
+    try:
+        from src.pa09_birthday_attack.birthday_attack import birthday_attack_floyd
+        H = get_dlp_hash()
+        def hash_fn(b: bytes) -> int:
+            return int.from_bytes(H.hash(b), 'big')
+        return birthday_attack_floyd(hash_fn, req.n_bits)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/birthday/toy_hash")
+def birthday_toy_hash(req: BirthdayRequest):
+    """
+    Run both naive and Floyd attacks on the deliberately weak toy hash.
+    n_bits ∈ {8,12,16}. Shows evaluations vs 2^(n/2) birthday bound.
+    """
+    try:
+        from src.pa09_birthday_attack.birthday_attack import toy_hash_attack
+        n = max(8, min(16, req.n_bits))
+        return toy_hash_attack(n)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/birthday/empirical")
+def birthday_empirical():
+    """
+    100 independent trials for each n ∈ {8,10,12,14,16}.
+    Returns empirical CDF + theoretical 1-e^(-k(k-1)/2^(n+1)) for each n.
+    """
+    try:
+        from src.pa09_birthday_attack.birthday_attack import empirical_birthday_curve
+        return {"curves": empirical_birthday_curve([8, 10, 12, 14, 16], trials_per_n=100)}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/birthday/dlp_truncated")
+def birthday_dlp_truncated(req: BirthdayRequest):
+    """
+    Attack the DLP hash truncated to n bits.
+    Confirms: even a provably-secure hash breaks at 2^(n/2) birthday bound.
+    """
+    try:
+        from src.pa09_birthday_attack.birthday_attack import attack_dlp_truncated
+        H = get_dlp_hash()
+        def dlp_fn(b: bytes) -> int:
+            return int.from_bytes(H.hash(b), 'big')
+        n = max(8, min(16, req.n_bits))
+        return attack_dlp_truncated(n, dlp_fn)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/birthday/md5_sha1_context")
+def birthday_md5_sha1():
+    """Compute 2^(n/2) birthday cost for MD5, SHA-1, SHA-256 at 10^9 hashes/s."""
+    try:
+        from src.pa09_birthday_attack.birthday_attack import md5_sha1_context
+        return md5_sha1_context(hashes_per_second=1e9)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
 
 
 # ── PA#10 HMAC ────────────────────────────────────────────────────────────────
 
 @app.post("/api/hmac/sign")
 def hmac_sign(req: HMACRequest):
+    """Compute HMAC_k(m) using PA#8 DLP hash."""
     try:
         k = bytes.fromhex(req.key_hex)
         m = bytes.fromhex(req.message_hex)
@@ -573,52 +814,95 @@ def hmac_sign(req: HMACRequest):
     except Exception as e:
         raise HTTPException(400, str(e))
 
-@app.post("/api/hmac/length_extension")
-def hmac_length_extension(req: LengthExtRequest):
-    try:
-        k = bytes.fromhex(req.key_hex)
-        m = bytes.fromhex(req.message_hex)
-        suffix = bytes.fromhex(req.suffix_hex)
-        H = get_dlp_hash()
 
-        # Naive MAC: t = H(k || m) — what the server issues
-        naive_tag = H.hash(k + m)
-
-        # Padding of k||m (attacker knows this if they know len(k) and m)
-        pad_k_m = H.md.pad(k + m)
-        full_len = len(pad_k_m)
-
-        # Attacker's forged tag: start MD from state=naive_tag, process suffix
-        # The padding for the suffix must account for the length offset (full_len bytes before it)
-        suffix_blocks = H.md.pad(b'\x00' * full_len + suffix)[full_len:]
-        state = naive_tag
-        for i in range(0, len(suffix_blocks), H.md.block_size):
-            state = H.group.compress_fn(state, suffix_blocks[i:i + H.md.block_size])
-        attacker_tag = state
-
-        # Ground truth: H(pad(k||m) || suffix) computed from scratch — should match attacker_tag
-        ground_truth = H.hash(pad_k_m + suffix)
-        attack_succeeds = attacker_tag == ground_truth
-
-        return {
-            "naive_tag": naive_tag.hex(),
-            "pad_k_m_hex": pad_k_m.hex(),
-            "suffix_hex": suffix.hex(),
-            "attacker_tag": attacker_tag.hex(),
-            "ground_truth_tag": ground_truth.hex(),
-            "attack_succeeds": attack_succeeds,
-        }
-    except Exception as e:
-        raise HTTPException(400, str(e))
 
 @app.post("/api/hmac/verify")
 def hmac_verify(req: MACVerifyRequest):
+    """Constant-time HMAC verification."""
     try:
         k = bytes.fromhex(req.key_hex)
         m = bytes.fromhex(req.message_hex)
         t = bytes.fromhex(req.tag_hex)
         valid = get_hmac().verify(k, m, t)
         return {"valid": valid}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/length_extension")
+def hmac_length_extension(req: LengthExtRequest):
+    """
+    Full length-extension demo: shows attack succeeds on H(k||m),
+    and simultaneously shows it fails on HMAC.
+    """
+    try:
+        from src.pa10_hmac.hmac_impl import length_extension_demo
+        k = bytes.fromhex(req.key_hex)
+        m = bytes.fromhex(req.message_hex)
+        suffix = bytes.fromhex(req.suffix_hex)
+        H = get_dlp_hash()
+        return length_extension_demo(H, k, m, suffix)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/euf_cma")
+def hmac_euf_cma():
+    """Run EUF-CMA security game: 50 oracle queries, adversary tries to forge."""
+    try:
+        from src.pa10_hmac.hmac_impl import euf_cma_game
+        k = bytes.fromhex("0123456789abcdef0123456789abcdef")
+        return euf_cma_game(get_hmac(), k, n_queries=50)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/mac_hash")
+def hmac_mac_hash():
+    """MAC→CRHF: build MAC_Hash = MD(h') where h'(cv,b)=HMAC_k(cv‖b)."""
+    try:
+        from src.pa10_hmac.hmac_impl import mac_hash_demo
+        k = bytes.fromhex("0123456789abcdef0123456789abcdef")
+        return mac_hash_demo(get_hmac(), k)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/eth_enc")
+def hmac_eth_enc(req: HMACRequest):
+    """Encrypt-then-HMAC: returns (r_hex, c_hex, t_hex)."""
+    try:
+        from src.pa10_hmac.hmac_impl import EtHEnc
+        kE = bytes.fromhex(req.key_hex)
+        m  = bytes.fromhex(req.message_hex)
+        kM = bytes.fromhex(req.key_hex)  # use same key for demo; distinct in production
+        eth = EtHEnc(hmac_scheme=get_hmac())
+        r, c, t = eth.eth_enc(kE, kM, m)
+        return {"r": r.hex(), "c": c.hex(), "t": t.hex(),
+                "ciphertext_blob": (r+c).hex()}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/cca2_game")
+def hmac_cca2():
+    """IND-CCA2 game for Encrypt-then-HMAC."""
+    try:
+        from src.pa10_hmac.hmac_impl import cca2_game
+        return cca2_game(n_queries=20)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/hmac/timing_demo")
+def hmac_timing():
+    """Demonstrate constant-time vs naive comparison timing difference."""
+    try:
+        from src.pa10_hmac.hmac_impl import timing_side_channel_demo
+        k = bytes.fromhex("0123456789abcdef0123456789abcdef")
+        m = b"timing demo message"
+        tag = get_hmac().mac(k, m)
+        return timing_side_channel_demo(tag)
     except Exception as e:
         raise HTTPException(400, str(e))
 

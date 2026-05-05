@@ -15,14 +15,31 @@ export default function PA3Demo() {
   const [pendingRound, setPendingRound] = useState(null);
 
   const requestChallenge = async () => {
-    if (!m0 || !m1 || m0.length !== m1.length) return;
+    if (!m0 || !m1 || m0.length !== m1.length || m0.length % 2 !== 0) return;
     setLoading(true);
     setError(null);
     try {
       const b = Math.random() < 0.5 ? 0 : 1;
       const msg = b === 0 ? m0 : m1;
-      const enc = await api.enc.cpa(key, msg.padEnd(32,'0').slice(0,32));
-      setPendingRound({ b, ct: enc.ciphertext, r: enc.r });
+      const enc = await api.enc.cpa(key, msg, reuse);
+
+      if (reuse) {
+        // Broken mode: deterministic nonce → c = F_k(0) ⊕ m_b.
+        // Fetch reference ciphertext for m0 with the same broken nonce, then compare.
+        const ref0 = await api.enc.cpa(key, m0, true);
+        const autoGuess = enc.ciphertext === ref0.ciphertext ? 0 : 1;
+        const correct = autoGuess === b;
+        const newRound = { b, guess: autoGuess, correct, auto: true,
+          ct: enc.ciphertext?.slice(0,16)+'…', r: enc.r?.slice(0,8)+'…' };
+        setRounds(prev => {
+          const next = [...prev, newRound].slice(-20);
+          const wins = next.filter(rd=>rd.correct).length;
+          setAdvantage(Math.abs(wins/next.length - 0.5));
+          return next;
+        });
+      } else {
+        setPendingRound({ b, ct: enc.ciphertext, r: enc.r });
+      }
     } catch(e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -31,7 +48,7 @@ export default function PA3Demo() {
     if (!pendingRound) return;
     const { b, ct, r } = pendingRound;
     const correct = guess === b;
-    const newRound = { b, guess, correct, ct: ct?.slice(0,16)+'…', r: r?.slice(0,8)+'…' };
+    const newRound = { b, guess, correct, auto: false, ct: ct?.slice(0,16)+'…', r: r?.slice(0,8)+'…' };
     setRounds(prev => {
       const next = [...prev, newRound].slice(-20);
       const wins = next.filter(rd=>rd.correct).length;
@@ -65,7 +82,13 @@ export default function PA3Demo() {
           <HexInput label="Message m₀ (hex)" value={m0} onChange={setM0} disabled={loading || !!pendingRound} />
           <HexInput label="Message m₁ (hex, same length)" value={m1} onChange={setM1} disabled={loading || !!pendingRound} />
         </div>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+        {m0.length !== m1.length && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--accent-red)', marginTop: 4 }}>⚠ Messages must be of equal length.</div>
+        )}
+        {m0.length % 2 !== 0 && m0.length === m1.length && (
+          <div style={{ fontSize: '0.75rem', color: 'var(--accent-red)', marginTop: 4 }}>⚠ Message lengths must be even (valid hex).</div>
+        )}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, marginTop: 14, alignItems: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
             <input type="checkbox" checked={reuse} onChange={e=>setReuse(e.target.checked)} disabled={!!pendingRound} />
             <span>Reuse nonce (BROKEN mode)</span>
@@ -75,8 +98,8 @@ export default function PA3Demo() {
         </div>
 
         {!pendingRound ? (
-          <button className="btn btn-primary" onClick={requestChallenge} disabled={loading || m0.length !== m1.length}>
-            {'Encrypt (Challenger picks b)'}
+          <button className="btn btn-primary" onClick={requestChallenge} disabled={loading || !m0 || m0.length !== m1.length || m0.length % 2 !== 0}>
+            {reuse ? 'Encrypt + Auto-Break (Challenger picks b)' : 'Encrypt (Challenger picks b)'}
           </button>
         ) : (
           <div style={{ background: 'var(--bg-well)', borderRadius: 8, padding: 14, marginBottom: 8, border: '1px solid var(--border)' }}>
@@ -85,11 +108,6 @@ export default function PA3Demo() {
               <div style={{ fontFamily: 'var(--font-mono)', marginTop: 4 }}>
                 r = {pendingRound.r?.slice(0,16)}… &nbsp;&nbsp; ct = {pendingRound.ct?.slice(0,16)}…
               </div>
-              {reuse && (
-                <div style={{ marginTop: 8, color: 'var(--accent-red)', fontSize: '0.74rem' }}>
-                  ⚠ Reuse-nonce mode: same key + same nonce ⇒ same keystream. ct XOR m₀ or m₁ reveals b directly — advantage = 1.
-                </div>
-              )}
             </div>
             <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Your guess — was this m</span>
@@ -105,11 +123,18 @@ export default function PA3Demo() {
             <div className="advantage-fill" style={{ width: `${Math.min(advantage*200, 100)}%`, background: advColor }} />
           </div>
         </div>
+        {reuse && rounds.length > 0 && (
+          <div style={{ marginBottom: 8, padding: 10, background: 'rgba(231,76,60,0.06)', borderRadius: 6,
+            border: '1px solid rgba(231,76,60,0.2)', fontSize: '0.74rem', color: 'var(--accent-red)', lineHeight: 1.5 }}>
+            <strong>Broken mode:</strong> F_k(0) ⊕ m is deterministic. Adversary encrypts m₀ with the same fixed nonce,
+            compares ct* with ref enc(m₀) — match ⇒ b=0, no match ⇒ b=1. Advantage = 1.
+          </div>
+        )}
         {rounds.length > 0 && (
           <div style={{ maxHeight: 120, overflowY: 'auto', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
             {rounds.slice(-5).reverse().map((r,i) => (
               <div key={i} style={{ padding: '3px 0', color: r.correct ? 'var(--accent-green)' : 'var(--accent-red)' }}>
-                Round: b={r.b}, guess={r.guess} → {r.correct ? '✓ Correct' : '✗ Wrong'} | CT: {r.ct}
+                Round: b={r.b}, guess={r.guess}{r.auto ? ' [auto]' : ''} → {r.correct ? '✓ Correct' : '✗ Wrong'} | CT: {r.ct}
               </div>
             ))}
           </div>

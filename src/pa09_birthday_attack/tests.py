@@ -37,10 +37,11 @@ def test_birthday_evaluations_near_expected():
     assert result["evaluations"] < 1000
 
 def test_birthday_larger_space_needs_more():
-    """Larger n means more evaluations."""
-    r12 = birthday_attack_naive(lambda b: _toy_hash(b, 12), 12)
-    r16 = birthday_attack_naive(lambda b: _toy_hash(b, 16), 16)
-    assert r12.get("evaluations", 9999) < r16.get("evaluations", 0)
+    """Larger n means more evaluations on average (5 trials each)."""
+    RUNS = 5
+    avg12 = sum(birthday_attack_naive(lambda b: _toy_hash(b, 12), 12)["evaluations"] for _ in range(RUNS)) / RUNS
+    avg16 = sum(birthday_attack_naive(lambda b: _toy_hash(b, 16), 16)["evaluations"] for _ in range(RUNS)) / RUNS
+    assert avg12 < avg16
 
 def test_birthday_floyd():
     # n=12: FNV maps 4096 inputs to 3072 distinct values — plenty of collisions
