@@ -127,23 +127,24 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
     ? 'AES is a concrete PRP/PRF (NIST standard)'
     : 'DLP: g^x mod p is OWF/OWP under Discrete Log hardness';
 
+  const srcN = direction === 'backward' ? target : source;
+  const tgtN = direction === 'backward' ? source : target;
+
   const nodes = [{ primitive: foundation, theorem: '', security: '' }];
 
-  if (source && source !== foundation) {
-    const th = FOUNDATION_BUILDS[foundation]?.[source] || `${foundation}→${source}`;
-    nodes.push({ primitive: source, theorem: th, security: foundationSecurity });
+  if (srcN && srcN !== foundation) {
+    const th = FOUNDATION_BUILDS[foundation]?.[srcN] || `${foundation}→${srcN}`;
+    nodes.push({ primitive: srcN, theorem: th, security: foundationSecurity });
   }
 
-  if (target && target !== source && target !== foundation) {
+  if (tgtN && tgtN !== srcN && tgtN !== foundation) {
     nodes.push({
-      primitive: target,
-      theorem: routeInfo?.theorem || `${source}→${target}`,
+      primitive: tgtN,
+      theorem: routeInfo?.theorem || `${srcN}→${tgtN}`,
       security: routeInfo?.security_claim || '',
     });
   }
 
-  // Multi-hop: if routeInfo has a path with intermediate nodes
-  // routeInfo.path is sometimes present for multi-hop reductions
   const deduped = nodes.filter((n, i) => i === 0 || n.primitive !== nodes[i - 1].primitive);
 
   return (
@@ -152,7 +153,7 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
         <span style={{ color: 'var(--text-muted)', marginRight: 8 }}>{open ? '▼' : '▶'}</span>
         <h3 style={{ margin: 0, display: 'inline' }}>Reduction Proof</h3>
         <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginLeft: 12 }}>
-          {foundation} → {source}{target && target !== source ? ` → ${target}` : ''}
+          {foundation} → {srcN}{tgtN && tgtN !== srcN ? ` → ${tgtN}` : ''}
           {direction === 'backward' ? ' (backward)' : ''}
         </span>
         {routeInfo?.theorem && (
@@ -169,8 +170,8 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
         <div className="proof-body">
           <FlowDiagram
             nodes={deduped}
-            activeSource={source}
-            activeTarget={target}
+            activeSource={srcN}
+            activeTarget={tgtN}
           />
 
           {routeInfo?.security_claim && (

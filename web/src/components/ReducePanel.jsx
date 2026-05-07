@@ -2,21 +2,23 @@ import React, { useState } from 'react';
 
 const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
 
-export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, onRun }) {
+export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, onRun, direction }) {
   const [busy, setBusy] = useState(false);
   const handleRun = async () => {
     setBusy(true);
     try { await onRun(); } finally { setBusy(false); }
   };
+  const srcN = direction === 'backward' ? target : source;
+  const tgtN = direction === 'backward' ? source : target;
   return (
     <div className="column-panel">
       <div className="column-header">
-        <h2 className="col2-header">Column 2 — Reduce</h2>
-        <span className="col-badge">Leg 2: A → B</span>
+        <h2 className="col2-header">Reduction</h2>
+        <span className="col-badge">{srcN} → {tgtN}</span>
       </div>
 
       <div className="form-group">
-        <label>Target Primitive B</label>
+        <label>Target Primitive (B)</label>
         <select value={target} onChange={e => setTarget(e.target.value)}>
           {primitives.filter(p => p !== source).map(p => (
             <option key={p} value={p}>{p} (PA#{PA_NUMS[p]})</option>
@@ -46,7 +48,7 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
 
       <div className="form-group">
         <label>
-          Reduction Steps: {source} → {target}
+          Reduction Steps: {srcN} → {tgtN}
           <span style={{ float: 'right', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             A is a black box here
           </span>

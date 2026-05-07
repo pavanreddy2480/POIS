@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const PA_NUMS = { OWF: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10 };
+const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
 
 export default function BuildPanel({ foundation, source, setSource, primitives, keyHex, setKeyHex, steps, onRun }) {
   const [busy, setBusy] = useState(false);
@@ -11,12 +11,12 @@ export default function BuildPanel({ foundation, source, setSource, primitives, 
   return (
     <div className="column-panel">
       <div className="column-header">
-        <h2 className="col1-header">Column 1 — Build</h2>
-        <span className="col-badge">Leg 1: Foundation → A</span>
+        <h2 className="col1-header">Build</h2>
+        <span className="col-badge">{foundation} → {source}</span>
       </div>
 
       <div className="form-group">
-        <label>Source Primitive A</label>
+        <label>Source Primitive (A)</label>
         <select value={source} onChange={e => setSource(e.target.value)}>
           {primitives.map(p => (
             <option key={p} value={p}>{p} (PA#{PA_NUMS[p]})</option>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
 
 function xorHex(a, b) {
@@ -50,8 +50,14 @@ export default function App() {
     return () => document.removeEventListener('focus', moveCursorToEnd, true);
   }, []);
 
-  const runComputations = useCallback(async () => {
-    if (!keyHex || keyHex.length < 8) return;
+  // Plain async function — redefined on every render so it always closes over the
+  // current keyHex / queryHex / foundation / source / target / direction.
+  const runComputations = async () => {
+    if (!keyHex || !keyHex.trim()) {
+      setBuildSteps([]);
+      setReduceSteps([]);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -167,9 +173,17 @@ export default function App() {
           steps2.push({ label: 'PRG(s)', fn: 'b(x₁)‖b(x₂)‖…', value: rp.output_hex, desc: `Hard-core bit extraction (${(rp.ones_ratio*100).toFixed(1)}% ones)` });
 
         } else if (srcN === 'PRF' && tgtN === 'PRP') {
-          const r = await api.prf.evaluate(k32, qPad.slice(0, 32));
-          steps2.push({ label: 'F_k(L)', fn: 'PRF round fn', value: r.output, desc: 'PRF evaluation (Feistel round)' });
-          steps2.push({ label: 'PRP_k(x)', fn: '3-round Feistel[F_k]', value: r.output, desc: 'Luby-Rackoff: 3 rounds → secure PRP' });
+          const L0 = qPad.slice(0, 16), R0 = qPad.slice(16, 32) || '0'.repeat(16);
+          const r1 = await api.prf.evaluate(k32, L0.padEnd(32, '0'));
+          const R1 = xorHex(R0, r1.output.slice(0, 16));
+          const r2 = await api.prf.evaluate(k32, R1.padEnd(32, '0'));
+          const L1 = xorHex(L0, r2.output.slice(0, 16));
+          const r3 = await api.prf.evaluate(k32, L1.padEnd(32, '0'));
+          const R2 = xorHex(R1, r3.output.slice(0, 16));
+          steps2.push({ label: 'Round 1', fn: `R₁ = R₀ ⊕ F_k(L₀)`, value: `L₀=${L0.slice(0,8)}… R₁=${R1.slice(0,8)}…`, desc: 'Feistel round 1: swap & XOR with PRF output' });
+          steps2.push({ label: 'Round 2', fn: `L₁ = L₀ ⊕ F_k(R₁)`, value: `L₁=${L1.slice(0,8)}… R₁=${R1.slice(0,8)}…`, desc: 'Feistel round 2' });
+          steps2.push({ label: 'Round 3', fn: `R₂ = R₁ ⊕ F_k(L₁)`, value: `L₁=${L1.slice(0,8)}… R₂=${R2.slice(0,8)}…`, desc: 'Feistel round 3 — Luby-Rackoff: 3 rounds → secure PRP' });
+          steps2.push({ label: 'PRP_k(x)', fn: 'L₁ ‖ R₂', value: L1 + R2, desc: '3-round Luby-Rackoff PRP output' });
 
         } else if (srcN === 'PRP' && tgtN === 'MAC') {
           const r = await api.prf.evaluate(k32, qPad.slice(0, 32));
@@ -264,6 +278,19 @@ export default function App() {
           steps2.push({ label: 'PRP_k(m)', fn: 'AES eval', value: rp.output, desc: 'Underlying PRP — MAC forgery implies PRP distinguisher' });
           steps2.push({ label: 'PRP break', fn: 'MAC-forge ⇒ PRP-dist', value: `adv ≥ ε_MAC`, stub: true, desc: 'EUF-CMA MAC forger distinguishes PRP from random permutation' });
 
+        } else if (srcN === 'OWF' && tgtN === 'OWP') {
+          const r = await api.owf.evaluate(qShort.padEnd(16, '0'));
+          const owfOut = r.output.replace(/^0x/, '');
+          steps2.push({ label: 'x (input)', fn: 'domain Z_q', value: qShort.padEnd(16, '0'), desc: 'Input x ∈ Z_q — DLP OWF operates on the same domain as its range' });
+          steps2.push({ label: 'f(x) = g^x mod p', fn: 'DLP OWF eval', value: owfOut, desc: 'Evaluating g^x mod p at x' });
+          steps2.push({ label: 'OWP(x)', fn: 'bijection on Z_q', value: owfOut, desc: 'g^x is a bijection on Z_q (Discrete Log permutation) → OWF on permutation domain = OWP' });
+
+        } else if (srcN === 'CPA_ENC' && tgtN === 'CCA_ENC') {
+          const rcca = await api.cca.encrypt(k16, k16, qPad.slice(0, 32));
+          steps2.push({ label: 'r', fn: 'fresh nonce', value: rcca.r, desc: 'Random nonce r ← {0,1}ⁿ for CPA encryption layer' });
+          steps2.push({ label: 'c = CPA_Enc_kE(m)', fn: 'F_kE(r) ⊕ m', value: rcca.ciphertext, desc: 'CPA ciphertext — IND-CPA secure under PRF assumption' });
+          steps2.push({ label: 't = MAC_kM(r‖c)', fn: 'Encrypt-then-MAC', value: rcca.tag, desc: 'MAC over (r‖c) adds integrity: Enc-then-MAC → IND-CCA2 (PA#6)' });
+
         } else {
           // Multi-hop or unsupported: show routing steps with final computation
           if (route && route.steps) {
@@ -285,9 +312,18 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  }, [foundation, source, target, keyHex, queryHex, direction]);
+  };
 
-  useEffect(() => { runComputations(); }, [foundation, source, target, direction]);
+  // Ref always points to the freshest runComputations (updated each render).
+  // This lets stable callbacks and effects call through it without stale closures.
+  const runRef = useRef(null);
+  runRef.current = runComputations;
+
+  // Stable callback for button clicks — never goes stale.
+  const onRun = useCallback(() => runRef.current(), []);
+
+  // Auto-run only when primitives / direction change, NOT when key/query change.
+  useEffect(() => { runRef.current(); }, [foundation, source, target, direction]);
 
   const handleKeyChange = (v) => { setKeyHex(v); };
   const handleQueryChange = (v) => { setQueryHex(v); };
@@ -347,7 +383,7 @@ export default function App() {
           setProofOpen={setProofOpen}
           direction={direction}
           proofChain={proofChain}
-          onRun={runComputations}
+          onRun={onRun}
           onActiveChange={(id, label) => setActiveDemo({ id, label })}
         />
       </div>

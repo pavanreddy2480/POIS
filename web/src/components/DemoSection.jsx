@@ -179,6 +179,7 @@ export default function DemoSection({
               steps={reduceSteps}
               routeInfo={routeInfo}
               onRun={onRun}
+              direction={direction}
             />
             <ProofPanel
               open={proofOpen}
