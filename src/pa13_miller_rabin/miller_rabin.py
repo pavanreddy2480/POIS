@@ -94,6 +94,88 @@ def gen_safe_prime(bits: int) -> tuple:
         if is_prime(p):
             return p, q
 
+def miller_rabin_verbose(n: int, k: int = 20) -> dict:
+    """
+    Miller-Rabin test with full per-round witness trace.
+    Returns result, time, and list of rounds with a_i and squaring sequence.
+    """
+    import time
+
+    def _fmt(v, ref):
+        """Format integer: decimal if small, hex if large."""
+        if v < 10**15:
+            return str(v)
+        return hex(v)
+
+    if n < 2:
+        return {"result": "COMPOSITE", "rounds": [], "s": 0, "d": 0, "time_sec": 0}
+    if n == 2 or n == 3:
+        return {"result": "PROBABLY_PRIME", "rounds": [], "s": 0, "d": 1, "time_sec": 0}
+    if n % 2 == 0:
+        return {"result": "COMPOSITE", "rounds": [], "s": 1, "d": (n - 1) // 2, "time_sec": 0}
+
+    s, d = 0, n - 1
+    while d % 2 == 0:
+        s += 1
+        d //= 2
+
+    def _random_int(low, high):
+        r = high - low + 1
+        nbytes = (r.bit_length() + 7) // 8
+        while True:
+            v = int.from_bytes(os.urandom(nbytes), 'big') % r
+            if v + low <= high:
+                return v + low
+
+    start = time.perf_counter()
+    rounds = []
+    result = "PROBABLY_PRIME"
+
+    for i in range(k):
+        a = _random_int(2, n - 2)
+        x = mod_pow(a, d, n)
+        sequence = [x]
+        is_witness = False
+
+        if x == 1 or x == n - 1:
+            reason = "x₀ = 1" if x == 1 else "x₀ = n−1"
+        else:
+            reason = "witness"
+            for _ in range(s - 1):
+                x = mod_pow(x, 2, n)
+                sequence.append(x)
+                if x == n - 1:
+                    reason = "x = n−1 after squaring"
+                    break
+            else:
+                is_witness = True
+                result = "COMPOSITE"
+
+        rounds.append({
+            "round": i + 1,
+            "a": _fmt(a, n),
+            "x0": _fmt(sequence[0], n),
+            "sequence": [_fmt(v, n) for v in sequence[:5]],
+            "witness": is_witness,
+            "reason": reason if not is_witness else "WITNESS — composite proven",
+        })
+
+        if is_witness:
+            break
+
+    elapsed = round(time.perf_counter() - start, 6)
+    return {
+        "n": str(n),
+        "result": result,
+        "s": s,
+        "d": str(d),
+        "rounds": rounds,
+        "rounds_run": len(rounds),
+        "rounds_requested": k,
+        "time_sec": elapsed,
+    }
+
+
 def carmichael_demo():
     """Show that n=561 passes naive Fermat but fails Miller-Rabin."""
     n = 561  # 561 = 3 * 11 * 17

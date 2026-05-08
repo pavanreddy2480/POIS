@@ -119,30 +119,39 @@ def build_equality_circuit(n_bits: int) -> Circuit:
     return c
 
 
-def build_addition_circuit(n_bits: int) -> Circuit:
+def build_addition_circuit(n_bits: int) -> 'Circuit':
     """
-    Build a ripple-carry adder circuit for x + y mod 2^n.
+    Ripple-carry adder: x + y mod 2^n.
     Inputs: x[0..n-1] (LSB first), y[0..n-1] (LSB first).
-    Outputs: sum[0..n-1] (LSB first).
+    Outputs (last n_bits wires): sum[0..n-1] (LSB first).
     """
     c = Circuit(2 * n_bits, n_bits)
 
-    carry = c.add_gate('XOR', [0, 0])  # carry = 0 initially
+    # Constant 0: XOR(x[0], x[0]) = 0
+    const0 = c.add_gate('XOR', [0, 0])
+
+    carry = const0
     sum_wires = []
 
     for i in range(n_bits):
         xi, yi = i, n_bits + i
-
-        # sum_i = x_i XOR y_i XOR carry
-        xor1 = c.add_gate('XOR', [xi, yi])
-        sum_i = c.add_gate('XOR', [xor1, carry])
+        xor_xy = c.add_gate('XOR', [xi, yi])
+        sum_i = c.add_gate('XOR', [xor_xy, carry])
         sum_wires.append(sum_i)
+        # carry = (xi AND yi) XOR ((xi XOR yi) AND carry)
+        # These two terms are mutually exclusive so XOR = OR here.
+        and_xy = c.add_gate('AND', [xi, yi])
+        and_xc = c.add_gate('AND', [xor_xy, carry])
+        carry = c.add_gate('XOR', [and_xy, and_xc])
 
-        # carry_new = (x_i AND y_i) OR ((x_i XOR y_i) AND carry)
-        and1 = c.add_gate('AND', [xi, yi])
-        and2 = c.add_gate('AND', [xor1, carry])
-        new_carry = c.add_gate('XOR', [and1, and2])  # OR via carry logic
-        carry = new_carry
+    # Route sum wires to the end via XOR-with-0 (free passthrough)
+    for sw in sum_wires:
+        c.add_gate('XOR', [sw, const0])
 
     c.n_outputs = n_bits
-    return c, sum_wires
+    return c
+
+
+def build_adder_circuit(n_bits: int) -> 'Circuit':
+    """Alias for build_addition_circuit."""
+    return build_addition_circuit(n_bits)

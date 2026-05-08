@@ -77,6 +77,9 @@ export const api = {
     exchange: (bits = 32) => post('/dh/exchange', { bits }),
     exchangeCustom: (alice_priv_hex, bob_priv_hex, bits = 32) =>
       post('/dh/exchange_custom', { alice_priv_hex, bob_priv_hex, bits }),
+    mitm: (alice_priv_hex, bob_priv_hex, bits = 32) =>
+      post('/dh/mitm', { alice_priv_hex, bob_priv_hex, bits }),
+    cdhHardness: () => post('/dh/cdh_hardness', {}),
   },
   rsa: {
     keygen: (bits = 128) => post('/rsa/keygen', { bits }),
@@ -84,17 +87,30 @@ export const api = {
   },
   millerRabin: {
     test: (n, k = 20) => post('/miller_rabin/test', { n, k }),
+    testVerbose: (n_str, k = 20) => post('/miller_rabin/test_verbose', { n_str: String(n_str), k }),
     genPrime: (bits = 64) => post('/miller_rabin/gen_prime', { bits }),
+    carmichaelDemo: () => post('/miller_rabin/carmichael_demo', {}),
+    benchmark: () => post('/miller_rabin/benchmark', {}),
   },
   crt: { solve: (residues, moduli) => post('/crt/solve', { residues, moduli }) },
   sig: { sign: (key_hex, message_hex) => post('/sig/sign', { key_hex, message_hex }) },
   elgamal: {
     keygen: () => post('/elgamal/keygen', {}),
     encrypt: (N_hex, e, m) => post('/elgamal/encrypt', { N_hex, e, m }),
+    demo: (message, multiplier) => post('/elgamal/demo', { message, multiplier }),
+    cpaGame: () => post('/elgamal/cpa_game', {}),
   },
   ot: { run: (b, m0, m1) => post('/ot/run', { b, m0, m1 }) },
-  secureAnd: { compute: (a, b) => post('/secure_and/compute', { a, b }) },
-  mpc: { millionaire: (x, y, n_bits = 4) => post('/mpc/millionaire', { x, y, n_bits }) },
+  secureAnd: {
+    compute: (a, b) => post('/secure_and/compute', { a, b }),
+    demo: (a, b) => post('/secure_and/demo', { a, b }),
+    runAll: () => post('/secure_and/run_all', {}),
+  },
+  mpc: {
+    millionaire: (x, y, n_bits = 4) => post('/mpc/millionaire', { x, y, n_bits }),
+    equality: (x, y, n_bits = 4) => post('/mpc/equality', { x, y, n_bits }),
+    addition: (x, y, n_bits = 4) => post('/mpc/addition', { x, y, n_bits }),
+  },
   reduce: Object.assign(
     (source, target, foundation = 'AES') => post('/reduce', { source, target, foundation }),
     { all: () => get('/reduce/all') }

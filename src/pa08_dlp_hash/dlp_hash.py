@@ -211,6 +211,7 @@ class DLPHashGroup:
             "q": self.q,
             "g": self.g,
             "h": self.h,
+            "bits": self.bits,
             "p_bits": self.p.bit_length(),
             "q_bits": self.q.bit_length(),
             "p_hex": hex(self.p),

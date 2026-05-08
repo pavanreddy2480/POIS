@@ -45,6 +45,49 @@ class SecureGates:
         })
         return result
 
+    def AND_verbose(self, a: int, b: int) -> dict:
+        """
+        Secure AND via OT — returns full intermediate step detail for demo/visualization.
+        Privacy arguments:
+          (a) Bob learns nothing about a beyond a∧b: OT receiver privacy — Bob only decrypts C_b.
+          (b) Alice learns nothing about b: OT sender privacy — (pk0,pk1) are computationally
+              indistinguishable from uniform group elements regardless of Bob's choice b.
+        """
+        assert a in (0, 1) and b in (0, 1), "AND gate inputs must be bits"
+        m0, m1 = 0, a  # Alice's OT sender messages: (0, a)
+
+        # Step 1: Bob generates (pk_b honest, pk_{1-b} random/trapdoor-free)
+        pk0, pk1, state = self.ot.receiver_step1(b)
+
+        # Step 2: Alice encrypts both messages under each public key
+        C0, C1 = self.ot.sender_step(pk0, pk1, m0, m1)
+
+        # Step 3: Bob decrypts only C_b using sk_b
+        result = self.ot.receiver_step2(state, C0, C1)
+        result = result % 2
+
+        self._transcript.append({
+            "gate": "AND",
+            "alice_input_a": a,
+            "bob_choice_b": b,
+            "ot_messages": (m0, m1),
+            "result": result,
+        })
+
+        return {
+            "a": a, "b": b,
+            "result": result,
+            "correct": result == (a & b),
+            # OT step 1: what Alice sees (cannot distinguish b from 1-b)
+            "pk0_h": str(pk0["h"]),
+            "pk1_h": str(pk1["h"]),
+            "honest_key_index": b,
+            # OT step 2: Alice's messages and ciphertexts
+            "m0_sent": m0, "m1_sent": m1,
+            "C0": [str(C0[0]), str(C0[1])],
+            "C1": [str(C1[0]), str(C1[1])],
+        }
+
     def XOR(self, a: int, b: int) -> int:
         """
         Secure XOR via additive secret sharing over Z_2 (free — no OT needed).

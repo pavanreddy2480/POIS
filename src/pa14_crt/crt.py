@@ -35,8 +35,8 @@ def integer_nth_root(n: int, e: int) -> int:
     if e == 1:
         return n
 
-    # Initial guess
-    x = int(n ** (1.0 / e)) + 2
+    # Initial guess: bit-ceiling always starts >= true root (avoids float precision loss)
+    x = 1 << ((n.bit_length() + e - 1) // e)
 
     while True:
         x1 = ((e - 1) * x + n // (x ** (e - 1))) // e
@@ -44,11 +44,9 @@ def integer_nth_root(n: int, e: int) -> int:
             break
         x = x1
 
-    # Verify and adjust
+    # Fine-tune by at most a few steps (Newton converges from above)
     while x ** e > n:
         x -= 1
-    while (x + 1) ** e <= n:
-        x += 1
 
     return x
 

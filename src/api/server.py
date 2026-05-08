@@ -196,6 +196,10 @@ class MillerRabinRequest(BaseModel):
     n: int
     k: int = 20
 
+class MillerRabinVerboseRequest(BaseModel):
+    n_str: str   # decimal string — avoids JS integer precision loss for large primes
+    k: int = 20
+
 class CRTRequest(BaseModel):
     residues: List[int]
     moduli: List[int]
@@ -210,6 +214,11 @@ class SecureANDRequest(BaseModel):
     b: int
 
 class MillionaireRequest(BaseModel):
+    x: int
+    y: int
+    n_bits: int = 4
+
+class AdditionRequest(BaseModel):
     x: int
     y: int
     n_bits: int = 4
@@ -951,6 +960,92 @@ def dh_exchange_custom(req: DHCustomRequest):
     except Exception as e:
         raise HTTPException(400, str(e))
 
+@app.post("/api/dh/mitm")
+def dh_mitm(req: DHCustomRequest):
+    """Full DH exchange + Eve's MITM attack. Returns honest keys and compromised keys."""
+    try:
+        from src.pa11_dh.dh import DiffieHellman
+        from src.pa13_miller_rabin.miller_rabin import mod_pow
+        dh = DiffieHellman(bits=req.bits)
+        if req.alice_priv_hex:
+            a = int(req.alice_priv_hex, 16) % dh.q
+            if a < 2: a = 2
+        else:
+            a, _ = dh.dh_alice_step1()
+        if req.bob_priv_hex:
+            b = int(req.bob_priv_hex, 16) % dh.q
+            if b < 2: b = 2
+        else:
+            b, _ = dh.dh_bob_step1()
+        A = mod_pow(dh.g, a, dh.p)
+        B = mod_pow(dh.g, b, dh.p)
+        # Eve generates her ephemeral key
+        e = dh._random_exponent()
+        E = mod_pow(dh.g, e, dh.p)
+        # Alice computes K = E^a (she thinks E is Bob's B)
+        KA_mitm = mod_pow(E, a, dh.p)
+        # Bob computes K = E^b (he thinks E is Alice's A)
+        KB_mitm = mod_pow(E, b, dh.p)
+        # Eve holds both: A^e shared with Alice, B^e shared with Bob
+        K_eve_alice = mod_pow(A, e, dh.p)  # == KA_mitm
+        K_eve_bob   = mod_pow(B, e, dh.p)  # == KB_mitm
+        # Honest exchange values (for reference)
+        KA_honest = dh.dh_alice_step2(a, B)
+        KB_honest = dh.dh_bob_step2(b, A)
+        return {
+            "p": hex(dh.p), "q": hex(dh.q), "g": hex(dh.g),
+            "alice_private": hex(a), "alice_public": hex(A),
+            "bob_private": hex(b), "bob_public": hex(B),
+            "alice_shared_secret": hex(KA_honest),
+            "bob_shared_secret": hex(KB_honest),
+            "keys_match": KA_honest == KB_honest,
+            # MITM — what Alice and Bob actually compute when Eve is active
+            "alice_mitm_secret": hex(KA_mitm),
+            "bob_mitm_secret": hex(KB_mitm),
+            "mitm_keys_differ": KA_mitm != KB_mitm,
+            # Eve's view
+            "eve_private": hex(e),
+            "eve_public": hex(E),
+            "eve_key_with_alice": hex(K_eve_alice),
+            "eve_key_with_bob": hex(K_eve_bob),
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post("/api/dh/cdh_hardness")
+def dh_cdh_hardness():
+    """Brute-force CDH for small params (q ≈ 2^20). Reports time and evaluations."""
+    import time
+    try:
+        from src.pa11_dh.dh import DiffieHellman
+        from src.pa13_miller_rabin.miller_rabin import mod_pow
+        dh = DiffieHellman(bits=22)   # q ≈ 2^20 — small enough to brute-force
+        a, A = dh.dh_alice_step1()
+        b, B = dh.dh_bob_step1()
+        K_true = dh.dh_alice_step2(a, B)
+        # Brute-force: find a by trying g^x == A
+        start = time.perf_counter()
+        found_a = None
+        for x in range(1, int(dh.q) + 1):
+            if mod_pow(dh.g, x, dh.p) == A:
+                found_a = x
+                break
+        elapsed = round(time.perf_counter() - start, 4)
+        K_found = mod_pow(B, found_a, dh.p) if found_a is not None else None
+        return {
+            "q_bits": dh.q.bit_length(),
+            "p": hex(dh.p), "q": hex(dh.q), "g": hex(dh.g),
+            "A": hex(A), "B": hex(B),
+            "K_true": hex(K_true),
+            "found_a": hex(found_a) if found_a is not None else None,
+            "K_found": hex(K_found) if K_found is not None else None,
+            "correct": K_found == K_true,
+            "evaluations": found_a if found_a is not None else int(dh.q),
+            "time_sec": elapsed,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
 
 # ── PA#12 RSA ─────────────────────────────────────────────────────────────────
 
@@ -1000,6 +1095,75 @@ def miller_rabin_gen(req: RSAKeygenRequest):
         from src.pa13_miller_rabin.miller_rabin import gen_prime
         p = gen_prime(req.bits)
         return {"prime": hex(p), "bits": p.bit_length()}
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post("/api/miller_rabin/test_verbose")
+def miller_rabin_test_verbose(req: MillerRabinVerboseRequest):
+    """Full Miller-Rabin with per-round witness trace and timing."""
+    try:
+        from src.pa13_miller_rabin.miller_rabin import miller_rabin_verbose
+        n = int(req.n_str)
+        return miller_rabin_verbose(n, req.k)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post("/api/miller_rabin/carmichael_demo")
+def carmichael_demo_endpoint():
+    """Shows n=561 passes naive Fermat but is COMPOSITE by Miller-Rabin."""
+    try:
+        from src.pa13_miller_rabin.miller_rabin import carmichael_demo, miller_rabin_verbose
+        demo = carmichael_demo()
+        # Full verbose trace on 561 with k=5 rounds
+        trace = miller_rabin_verbose(561, 5)
+        # Fermat test values for several bases coprime to 561
+        bases = [2, 4, 5, 7, 8, 10, 13, 14]
+        fermat_values = [{"base": a, "value": pow(a, 560, 561), "passes": pow(a, 560, 561) == 1}
+                         for a in bases]
+        return {
+            **demo,
+            "fermat_values": fermat_values,
+            "mr_trace": trace,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+@app.post("/api/miller_rabin/benchmark")
+def miller_rabin_benchmark():
+    """Benchmark: avg candidates before finding 512/1024/2048-bit primes vs O(ln n) theory."""
+    import time, math
+    try:
+        from src.pa13_miller_rabin.miller_rabin import miller_rabin
+        results = []
+        config = [(512, 5), (1024, 3), (2048, 1)]
+        for bits, trials in config:
+            candidates_list = []
+            trial_times = []
+            for _ in range(trials):
+                count = 0
+                t0 = time.perf_counter()
+                while True:
+                    count += 1
+                    n = int.from_bytes(os.urandom(bits // 8), 'big')
+                    n |= (1 << (bits - 1))
+                    n |= 1
+                    if miller_rabin(n, 20) == "PROBABLY_PRIME":
+                        break
+                trial_times.append(round(time.perf_counter() - t0, 3))
+                candidates_list.append(count)
+            avg_c = round(sum(candidates_list) / len(candidates_list), 1)
+            # PNT: among odd b-bit numbers, expected candidates ≈ bits*ln(2)/2
+            theoretical = round(bits * math.log(2) / 2, 1)
+            results.append({
+                "bits": bits,
+                "trials": trials,
+                "avg_candidates": avg_c,
+                "theoretical_pnt": theoretical,
+                "ratio": round(avg_c / theoretical, 2),
+                "samples": candidates_list,
+                "avg_time_sec": round(sum(trial_times) / len(trial_times), 3),
+            })
+        return {"results": results}
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -1089,6 +1253,66 @@ def ot_run(req: OTRequest):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/ot/demo")
+def ot_demo(req: OTRequest):
+    """
+    Full OT demo: runs the 3-step Bellare-Micali protocol and returns:
+    - Per-step trace (pk0, pk1, C0, C1, m_b)
+    - Cheat attempt: receiver uses sk_b on C_{1-b} → garbage
+    - 100 correctness trials
+    """
+    try:
+        ot = get_ot()
+        b = req.b % 2
+        m0, m1 = req.m0, req.m1
+
+        # ── Step 1: Receiver generates key pairs ──
+        pk0, pk1, state = ot.receiver_step1(b)
+        sk_b = state["sk_b"]
+        pk_b = state["pk_enc"]
+
+        # ── Step 2: Sender encrypts both messages ──
+        C0, C1 = ot.sender_step(pk0, pk1, m0, m1)
+
+        # ── Step 3: Receiver decrypts C_b ──
+        m_b = ot.receiver_step2(state, C0, C1)
+
+        # ── Cheat: use sk_b to try to decrypt C_{1-b} ──
+        C_other = C1 if b == 0 else C0
+        m_other = m1 if b == 0 else m0
+        cheat_dec = ot.eg.dec(sk_b, pk_b, C_other[0], C_other[1])
+
+        # ── 100 correctness trials ──
+        trials, passed = 100, 0
+        for _ in range(trials):
+            rb = int.from_bytes(os.urandom(1), 'big') % 2
+            rm0 = (int.from_bytes(os.urandom(1), 'big') % 98) + 2
+            rm1 = (int.from_bytes(os.urandom(1), 'big') % 98) + 2
+            pk0t, pk1t, st = ot.receiver_step1(rb)
+            C0t, C1t = ot.sender_step(pk0t, pk1t, rm0, rm1)
+            m_bt = ot.receiver_step2(st, C0t, C1t)
+            if m_bt == (rm0 if rb == 0 else rm1):
+                passed += 1
+
+        return {
+            "b": b, "m0": m0, "m1": m1,
+            "m_b": m_b,
+            "m_b_correct": m_b == (m0 if b == 0 else m1),
+            "m_other": m_other,
+            "honest_key_index": b,
+            "pk0_h": str(pk0["h"]),
+            "pk1_h": str(pk1["h"]),
+            "C0": [str(C0[0]), str(C0[1])],
+            "C1": [str(C1[0]), str(C1[1])],
+            "cheat_dec": str(cheat_dec),
+            "cheat_matches": cheat_dec == m_other,
+            "correctness_trials": trials,
+            "correctness_pass": passed,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 # ── PA#19 Secure AND ─────────────────────────────────────────────────────────
 
 @app.post("/api/secure_and/compute")
@@ -1108,18 +1332,114 @@ def secure_and(req: SecureANDRequest):
         raise HTTPException(400, str(e))
 
 
+@app.post("/api/secure_and/demo")
+def secure_and_demo(req: SecureANDRequest):
+    """
+    Full step-by-step Secure AND demo:
+    - Verbose AND with OT intermediate values (pk0, pk1, C0, C1)
+    - XOR detail with additive secret sharing trace (random r, shares)
+    - Privacy summary: what Alice learns vs what Bob learns
+    """
+    try:
+        gates = get_secure_gates()
+        a, b = req.a % 2, req.b % 2
+
+        # Verbose AND
+        and_detail = gates.AND_verbose(a, b)
+
+        # XOR with explicit secret-sharing trace
+        r = int.from_bytes(os.urandom(1), 'big') % 2
+        alice_share = a ^ r
+        bob_share = b ^ r
+        xor_result = alice_share ^ bob_share
+
+        # NOT
+        not_result = gates.NOT(a)
+
+        return {
+            "a": a, "b": b,
+            # AND result + OT trace
+            "AND": and_detail["result"],
+            "AND_correct": and_detail["correct"],
+            "pk0_h": and_detail["pk0_h"],
+            "pk1_h": and_detail["pk1_h"],
+            "honest_key_index": and_detail["honest_key_index"],
+            "m0_sent": and_detail["m0_sent"],
+            "m1_sent": and_detail["m1_sent"],
+            "C0": and_detail["C0"],
+            "C1": and_detail["C1"],
+            # XOR secret-sharing trace
+            "XOR": xor_result,
+            "xor_r": r,
+            "alice_share": alice_share,
+            "bob_share": bob_share,
+            # NOT
+            "NOT_a": not_result,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/secure_and/run_all")
+def secure_and_run_all(req: dict = None):
+    """
+    Run all 4 (a,b) combinations and verify AND/XOR correctness across multiple runs.
+    Returns per-combo results with pass/fail for the truth table demo.
+    """
+    try:
+        gates = get_secure_gates()
+        combos = []
+        for ai in (0, 1):
+            for bi in (0, 1):
+                runs = 10
+                and_pass = sum(1 for _ in range(runs) if gates.AND(ai, bi) == (ai & bi))
+                xor_pass = sum(1 for _ in range(runs) if gates.XOR(ai, bi) == (ai ^ bi))
+                combos.append({
+                    "a": ai, "b": bi,
+                    "expected_and": ai & bi,
+                    "expected_xor": ai ^ bi,
+                    "and_pass": and_pass,
+                    "xor_pass": xor_pass,
+                    "runs": runs,
+                    "and_correct": and_pass == runs,
+                    "xor_correct": xor_pass == runs,
+                })
+        all_and_correct = all(c["and_correct"] for c in combos)
+        all_xor_correct = all(c["xor_correct"] for c in combos)
+        return {
+            "combos": combos,
+            "all_and_correct": all_and_correct,
+            "all_xor_correct": all_xor_correct,
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
 # ── PA#20 MPC Millionaire ─────────────────────────────────────────────────────
 
 @app.post("/api/mpc/millionaire")
 def mpc_millionaire(req: MillionaireRequest):
     try:
-        from src.pa20_mpc.mpc import millionaires_problem, secure_equality
-        result = millionaires_problem(req.x, req.y, req.n_bits)
-        eq_result = secure_equality(req.x, req.y, req.n_bits)
-        result["x_eq_y"] = eq_result["equal"]
-        result["gate_count"] = result.get("ot_calls", req.n_bits)
-        result["xor_count"] = req.n_bits
-        return result
+        from src.pa20_mpc.mpc import millionaires_problem
+        return millionaires_problem(req.x, req.y, req.n_bits)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/mpc/equality")
+def mpc_equality(req: MillionaireRequest):
+    try:
+        from src.pa20_mpc.mpc import secure_equality
+        return secure_equality(req.x, req.y, req.n_bits)
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/mpc/addition")
+def mpc_addition(req: AdditionRequest):
+    try:
+        from src.pa20_mpc.mpc import secure_addition
+        return secure_addition(req.x, req.y, req.n_bits)
     except Exception as e:
         raise HTTPException(400, str(e))
 
@@ -1178,35 +1498,103 @@ def rsa_demo(req: RSADemoRequest):
 
 @app.post("/api/hastad/demo")
 def hastad_demo(req: HastadDemoRequest):
+    """
+    Håstad Broadcast Attack demo.
+    Without PKCS: c_i = m^3 mod N_i → CRT → cube root → recover m.
+    With PKCS: each sender pads m with different random PS bytes → EM_i differ →
+               CRT result ≠ any single EM^3 → cube root is garbage → attack fails.
+
+    Critical fix: Håstad requires e=3. pkcs15_enc uses e=65537 (wrong for this demo).
+    We use e=3 directly: c_i = (PKCS_EM_i)^3 mod N_i.
+    """
     try:
-        from src.pa12_rsa.rsa import RSA
         from src.pa14_crt.crt import crt, integer_nth_root
+        from src.pa13_miller_rabin.miller_rabin import gen_prime
+        from math import gcd
+
         m = req.message
         e = 3
-        rsa_inst = RSA()
-        keys_list = [rsa_inst.keygen(128) for _ in range(3)]
-        moduli = [k["pk"][0] for k in keys_list]
+
+        # --- Generate 3 independent moduli N_i ---
+        # Without PKCS: 64-bit N (spec: "64-bit N_i for instant computation")
+        # With PKCS:    96-bit N so PKCS padding fits (k=12 bytes, PS=8 bytes for 1-byte m)
+        key_bits = 96 if req.use_pkcs else 64
+
+        def _gen_modulus(bits):
+            """Generate N = p*q (fresh primes, suitable for e=3 demo)."""
+            while True:
+                p = gen_prime(bits // 2)
+                q = gen_prime(bits // 2)
+                if p != q:
+                    return p * q
+
+        moduli = [_gen_modulus(key_bits) for _ in range(3)]
 
         if req.use_pkcs:
-            m_bytes = m.to_bytes((m.bit_length() + 7) // 8 or 1, 'big')
-            ciphertexts = [rsa_inst.pkcs15_enc(k["pk"], m_bytes) for k in keys_list]
+            # Each sender independently pads m with different random PS bytes
+            m_bytes = m.to_bytes(max(1, (m.bit_length() + 7) // 8), 'big')
+            padded_ems = []   # hex strings of each EM for display
+            em_ints   = []    # integer values of EM
+            ciphertexts = []
+
+            for N in moduli:
+                k = (N.bit_length() + 7) // 8   # byte length of N
+                ps_len = k - len(m_bytes) - 3    # 0x00 | 0x02 | PS | 0x00 | m
+                if ps_len < 8:
+                    raise ValueError(f"N too small for PKCS ({N.bit_length()} bits)")
+
+                # Random nonzero PS — different for every sender (key randomisation)
+                ps = bytearray()
+                while len(ps) < ps_len:
+                    b = os.urandom(1)[0]
+                    if b != 0:
+                        ps.append(b)
+
+                em = bytes([0x00, 0x02]) + bytes(ps) + bytes([0x00]) + m_bytes
+                em_int = int.from_bytes(em, 'big')
+                # Encrypt with e=3 (Håstad context)
+                ct = pow(em_int, 3, N)
+
+                padded_ems.append(em.hex())
+                em_ints.append(str(em_int))
+                ciphertexts.append(ct)
+
+            # Attacker runs CRT then integer cube root
+            x = crt(ciphertexts, moduli)
+            root = integer_nth_root(x, e)
+            cube_root_exact = (root ** 3 == x)   # if False → garbage, attack failed
+
+            return {
+                "moduli":      [str(N) for N in moduli],
+                "ciphertexts": [str(c) for c in ciphertexts],
+                "m_cubed":     str(x),
+                "recovered":   str(root),
+                "attack_succeeded": False,          # always fails with PKCS
+                "cube_root_exact":  cube_root_exact,
+                "use_pkcs":    True,
+                "padded_ems":  padded_ems,          # hex EM for each sender
+                "em_ints":     em_ints,
+                "em_same":     (len(set(em_ints)) == 1),  # always False — different PS!
+            }
         else:
+            # Textbook Håstad: c_i = m^3 mod N_i  (no padding)
             ciphertexts = [pow(m, e, N) for N in moduli]
-
-        m_cubed_big = crt(ciphertexts, moduli)
-        root = integer_nth_root(m_cubed_big, e)
-        attack_succeeded = (root == m)
-
-        return {
-            "moduli": [str(N) for N in moduli],
-            "ciphertexts": [str(c) for c in ciphertexts],
-            "m_cubed": str(m_cubed_big),
-            "recovered": str(root),
-            "attack_succeeded": attack_succeeded,
-            "use_pkcs": req.use_pkcs,
-        }
-    except Exception as e:
-        raise HTTPException(400, str(e))
+            x = crt(ciphertexts, moduli)
+            root = integer_nth_root(x, e)
+            return {
+                "moduli":      [str(N) for N in moduli],
+                "ciphertexts": [str(c) for c in ciphertexts],
+                "m_cubed":     str(x),
+                "recovered":   str(root),
+                "attack_succeeded": (root == m),
+                "cube_root_exact":  (root ** 3 == x),
+                "use_pkcs":    False,
+                "padded_ems":  None,
+                "em_ints":     None,
+                "em_same":     None,
+            }
+    except Exception as exc:
+        raise HTTPException(400, str(exc))
 
 
 # ── PA#15 Signature Demo ──────────────────────────────────────────────────────
@@ -1248,17 +1636,118 @@ def elgamal_demo(req: ElGamalDemoRequest):
         eg = get_elgamal()
         keys = eg.keygen()
         pk, sk = keys["pk"], keys["sk"]
-        m = req.message % pk["q"]
+        p, q, g, h = pk["p"], pk["q"], pk["g"], pk["h"]
+        m = max(1, req.message % q)
+        k = max(1, req.multiplier % q)
         c1, c2 = eg.enc(pk, m)
         decrypted = eg.dec(sk, pk, c1, c2)
-        # Malleability: c2' = multiplier * c2 mod p
-        c2_prime = (req.multiplier * c2) % pk["p"]
+        c2_prime = (k * c2) % p
         malleable_dec = eg.dec(sk, pk, c1, c2_prime)
+        expected = (k * m) % p
         return {
-            "c1": str(c1),
-            "c2": str(c2),
+            "p": str(p), "g": str(g), "q": str(q), "h": str(h),
+            "sk": str(sk), "m": str(m),
+            "c1": str(c1), "c2": str(c2),
             "decrypted": str(decrypted),
+            "multiplier": k,
+            "c2_prime": str(c2_prime),
             "malleable_decrypted": str(malleable_dec),
+            "expected_malleable": str(expected),
+            "success": (malleable_dec == expected),
+        }
+    except Exception as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/elgamal/cpa_game")
+def elgamal_cpa_game():
+    """
+    IND-CPA game demo:
+    - Large group (32-bit): random adversary has advantage ≈ 0 (DDH hard)
+    - Small group (12-bit): brute-force DLP → advantage ≈ 0.5 (DDH easy)
+    - CCA oracle: submit modified ciphertext, oracle reveals 2m → CCA broken
+    """
+    try:
+        from src.pa16_elgamal.elgamal import ElGamal
+        from src.pa13_miller_rabin.miller_rabin import mod_pow, mod_inverse
+
+        rounds = 20
+
+        # --- Large group (32-bit): random adversary ---
+        eg_large = get_elgamal()
+        keys_l = eg_large.keygen()
+        pk_l, sk_l = keys_l["pk"], keys_l["sk"]
+        q_l, p_l = pk_l["q"], pk_l["p"]
+        correct_large = 0
+        for _ in range(rounds):
+            m0 = eg_large.group.random_exponent() % (q_l // 2) + 1
+            m1 = eg_large.group.random_exponent() % (q_l // 2) + 1
+            b = int.from_bytes(os.urandom(1), 'big') % 2
+            m_b = m0 if b == 0 else m1
+            c1, c2 = eg_large.enc(pk_l, m_b)
+            guess = int.from_bytes(os.urandom(1), 'big') % 2
+            if guess == b:
+                correct_large += 1
+        adv_large = round(abs(correct_large / rounds - 0.5), 4)
+
+        # --- Small group (12-bit): brute-force DLP distinguisher ---
+        eg_small = ElGamal(bits=12)
+        keys_s = eg_small.keygen()
+        pk_s, sk_s = keys_s["pk"], keys_s["sk"]
+        q_s, p_s, g_s, h_s = pk_s["q"], pk_s["p"], pk_s["g"], pk_s["h"]
+        correct_small = 0
+        for _ in range(rounds):
+            span = max(2, q_s // 4)
+            m0 = 2 + eg_small.group.random_exponent() % span
+            m1 = m0 + 1
+            b = int.from_bytes(os.urandom(1), 'big') % 2
+            m_b = m0 if b == 0 else m1
+            c1_s, c2_s = eg_small.enc(pk_s, m_b)
+            # Brute-force DLP: find r s.t. g^r == c1
+            guess = int.from_bytes(os.urandom(1), 'big') % 2
+            for r_try in range(1, min(q_s + 1, 4096)):
+                if mod_pow(g_s, r_try, p_s) == c1_s:
+                    h_r = mod_pow(h_s, r_try, p_s)
+                    m_dec = c2_s * mod_inverse(h_r, p_s) % p_s
+                    guess = 0 if m_dec == m0 else 1
+                    break
+            if guess == b:
+                correct_small += 1
+        adv_small = round(abs(correct_small / rounds - 0.5), 4)
+
+        # --- CCA oracle demo ---
+        eg = get_elgamal()
+        keys = eg.keygen()
+        pk, sk = keys["pk"], keys["sk"]
+        p = pk["p"]
+        m_ch = 42
+        c1_ch, c2_ch = eg.enc(pk, m_ch)
+        c2_mod = (2 * c2_ch) % p
+        oracle_out = eg.dec(sk, pk, c1_ch, c2_mod)
+        equals_2m = (oracle_out == (2 * m_ch) % p)
+
+        return {
+            "large_group": {
+                "q_bits": q_l.bit_length(),
+                "rounds": rounds,
+                "correct": correct_large,
+                "advantage": adv_large,
+            },
+            "small_group": {
+                "q_bits": q_s.bit_length(),
+                "rounds": rounds,
+                "correct": correct_small,
+                "advantage": adv_small,
+            },
+            "cca_demo": {
+                "m": m_ch,
+                "c1": str(c1_ch),
+                "c2": str(c2_ch),
+                "c2_modified": str(c2_mod),
+                "oracle_returned": str(oracle_out),
+                "equals_2m": equals_2m,
+                "recovered_m": str(oracle_out // 2),
+            },
         }
     except Exception as e:
         raise HTTPException(400, str(e))
@@ -1268,32 +1757,79 @@ def elgamal_demo(req: ElGamalDemoRequest):
 
 @app.post("/api/cca/demo")
 def cca_demo(req: CCADemoRequest):
+    """
+    PA#17 CCA-Secure PKC demo — Encrypt-then-Sign.
+    Returns both honest and tampered results plus a plain-ElGamal contrast,
+    so the frontend can reveal results step by step.
+    """
     try:
         from src.pa17_cca_pkc.cca_pkc import CCA_PKC
         from src.pa12_rsa.rsa import RSA
         from src.pa15_signatures.signatures import RSASignature
+
         eg = get_elgamal()
         rsa = RSA()
         sig = RSASignature(rsa)
         keys_enc = eg.keygen()
         keys_sign = rsa.keygen(128)
         cca = CCA_PKC(eg, sig)
-        # Encode message as integer (hash of string, reduced mod q)
+        pk_enc = keys_enc["pk"]
+        sk_enc = keys_enc["sk"]
+        p, q = pk_enc["p"], pk_enc["q"]
+
+        # Encode message as integer (hash → mod q)
         m_bytes = req.message.encode()
-        m_int = int.from_bytes(sig.H.hash(m_bytes), 'big') % keys_enc["pk"]["q"]
-        payload = cca.enc(keys_enc["pk"], keys_sign["sk"], keys_sign["pk"], m_int)
-        if req.tamper_ciphertext:
-            payload = dict(payload)
-            payload["c2"] = (payload["c2"] + 1) % keys_enc["pk"]["p"]
-            # ce_bytes now doesn't match sigma → verify will fail
-            payload["ce_bytes"] = (hex(payload["c1"]) + "|" + hex(payload["c2"])).encode()
-        result = cca.dec(keys_enc["sk"], keys_enc["pk"], keys_sign["pk"], payload)
+        m_int = int.from_bytes(sig.H.hash(m_bytes), 'big') % q
+
+        # ── Step 1: ElGamal Encrypt ──────────────────────────────────────────
+        c1, c2 = eg.enc(pk_enc, m_int)
+
+        # ── Step 2: Sign C_E ─────────────────────────────────────────────────
+        ce_bytes = (hex(c1) + "|" + hex(c2)).encode()
+        sigma = sig.sign(keys_sign["sk"], ce_bytes)
+        payload = {"c1": c1, "c2": c2, "sigma": sigma, "ce_bytes": ce_bytes}
+
+        # ── Honest CCA decrypt ────────────────────────────────────────────────
+        cca_honest = cca.dec(sk_enc, pk_enc, keys_sign["pk"], payload)
+
+        # ── Tampered: c2' = 2*c2 mod p ───────────────────────────────────────
+        c2_tampered = (2 * c2) % p
+        tampered_payload = {
+            "c1": c1,
+            "c2": c2_tampered,
+            "sigma": sigma,               # original sigma — covers OLD ce_bytes
+            "ce_bytes": (hex(c1) + "|" + hex(c2_tampered)).encode(),
+        }
+        # CCA: sig verification fires first → rejected
+        cca_tampered = cca.dec(sk_enc, pk_enc, keys_sign["pk"], tampered_payload)
+        sig_on_tampered = sig.verify(keys_sign["pk"], tampered_payload["ce_bytes"], sigma)
+
+        # ── Plain ElGamal contrast ────────────────────────────────────────────
+        eg_honest_dec = eg.dec(sk_enc, pk_enc, c1, c2)
+        eg_tampered_dec = eg.dec(sk_enc, pk_enc, c1, c2_tampered)
+
         return {
-            "c1": str(payload.get("c1", "")),
-            "c2": str(payload.get("c2", "")),
-            "sigma": str(payload.get("sigma", "")),
-            "success": result is not None,
-            "decrypted": req.message if result is not None else None,
+            # Keys (display)
+            "p": str(p), "g": str(pk_enc["g"]), "q": str(q), "h": str(pk_enc["h"]),
+            "message": req.message,
+            "m_int": str(m_int),
+            # Encrypt-then-Sign output
+            "c1": str(c1), "c2": str(c2),
+            "sigma": str(sigma),
+            # Honest CCA decrypt
+            "cca_honest_dec": str(cca_honest),
+            "cca_honest_success": cca_honest is not None,
+            # Tampered ciphertext
+            "c2_tampered": str(c2_tampered),
+            "sig_on_tampered": sig_on_tampered,         # always False
+            "cca_tampered_rejected": cca_tampered is None,  # always True
+            # Plain ElGamal contrast
+            "eg_honest_dec": str(eg_honest_dec),
+            "eg_tampered_dec": str(eg_tampered_dec),
+            "eg_tampered_equals_2m": (eg_tampered_dec == (2 * m_int) % p),
+            # Legacy field kept for compatibility
+            "success": cca_honest is not None,
+            "decrypted": req.message if cca_honest is not None else None,
         }
     except Exception as e:
         raise HTTPException(400, str(e))
