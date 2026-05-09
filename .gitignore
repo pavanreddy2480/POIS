@@ -22,7 +22,7 @@ sdist/
 wheels/
 pip-wheel-metadata/
 MANIFEST
-design/
+design/*
 
 # Virtual environments
 .venv/
