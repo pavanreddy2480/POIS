@@ -161,21 +161,21 @@ export default function DemoSection({
           <div className="explorer-panels">
             <BuildPanel
               foundation={foundation}
-              source={source}
-              setSource={setSource}
+              source={direction === 'backward' ? target : source}
+              setSource={direction === 'backward' ? setTarget : setSource}
               primitives={primitives}
-              keyHex={keyHex}
-              setKeyHex={setKeyHex}
+              keyHex={direction === 'backward' ? queryHex : keyHex}
+              setKeyHex={direction === 'backward' ? setQueryHex : setKeyHex}
               steps={buildSteps}
               onRun={onRun}
             />
             <ReducePanel
-              source={source}
-              target={target}
-              setTarget={setTarget}
+              source={direction === 'backward' ? target : source}
+              target={direction === 'backward' ? source : target}
+              setTarget={direction === 'backward' ? setSource : setTarget}
               primitives={primitives}
-              queryHex={queryHex}
-              setQueryHex={setQueryHex}
+              queryHex={direction === 'backward' ? keyHex : queryHex}
+              setQueryHex={direction === 'backward' ? setKeyHex : setQueryHex}
               steps={reduceSteps}
               routeInfo={routeInfo}
               onRun={onRun}

@@ -8,13 +8,11 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
     setBusy(true);
     try { await onRun(); } finally { setBusy(false); }
   };
-  const srcN = direction === 'backward' ? target : source;
-  const tgtN = direction === 'backward' ? source : target;
   return (
     <div className="column-panel">
       <div className="column-header">
         <h2 className="col2-header">Reduction</h2>
-        <span className="col-badge">{srcN} → {tgtN}</span>
+        <span className="col-badge">{source} → {target}</span>
       </div>
 
       <div className="form-group">
@@ -48,7 +46,7 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
 
       <div className="form-group">
         <label>
-          Reduction Steps: {srcN} → {tgtN}
+          Reduction Steps: {source} → {target}
           <span style={{ float: 'right', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             A is a black box here
           </span>

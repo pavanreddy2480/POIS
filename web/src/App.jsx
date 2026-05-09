@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from './api';
+import BuildPanel from './components/BuildPanel';
+import ReducePanel from './components/ReducePanel';
+import ProofPanel from './components/ProofPanel';
+import DemoSection from './components/DemoSection';
 
 function xorHex(a, b) {
   const len = Math.min(a.length, b.length);
@@ -10,10 +14,6 @@ function xorHex(a, b) {
   }
   return out;
 }
-import BuildPanel from './components/BuildPanel';
-import ReducePanel from './components/ReducePanel';
-import ProofPanel from './components/ProofPanel';
-import DemoSection from './components/DemoSection';
 
 const PRIMITIVES = ['OWF', 'OWP', 'PRG', 'PRF', 'PRP', 'MAC', 'CRHF', 'HMAC', 'CPA_ENC', 'CCA_ENC'];
 const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
@@ -53,7 +53,10 @@ export default function App() {
   // Plain async function — redefined on every render so it always closes over the
   // current keyHex / queryHex / foundation / source / target / direction.
   const runComputations = async () => {
-    if (!keyHex || !keyHex.trim()) {
+    const effKey = direction === 'backward' ? queryHex : keyHex;
+    const effQuery = direction === 'backward' ? keyHex : queryHex;
+
+    if (!effKey || !effKey.trim()) {
       setBuildSteps([]);
       setReduceSteps([]);
       return;
@@ -61,10 +64,13 @@ export default function App() {
     setLoading(true);
 
     try {
-      const k32  = keyHex.slice(0, 32).padEnd(32, '0');
-      const k16  = keyHex.slice(0, 16).padEnd(16, '0');
-      const qPad = (queryHex || '').padEnd(32, '0').slice(0, 32);
-      const qShort = (queryHex || '').padEnd(16, '0').slice(0, 16);
+      const srcN = direction === 'backward' ? target : source;
+      const tgtN = direction === 'backward' ? source : target;
+
+      const k32  = (effKey || '').slice(0, 32).padEnd(32, '0');
+      const k16  = (effKey || '').slice(0, 16).padEnd(16, '0');
+      const qPad = (effQuery || '').padEnd(32, '0').slice(0, 32);
+      const qShort = (effQuery || '').padEnd(16, '0').slice(0, 16);
 
       // ── Column 1: Foundation → Source ──────────────────────────────────────
       const steps1 = [];
@@ -72,80 +78,78 @@ export default function App() {
         steps1.push({ label: 'AES key', fn: 'AES-128 PRP/PRF', value: k32, desc: 'Foundation (AES PRP/PRF)' });
         try {
           const r0 = await api.prf.evaluate(k32, '0'.repeat(32));
-          if (source === 'OWF') {
+          if (srcN === 'OWF') {
             // Davies-Meyer: f(k) = AES_k(0^128) ⊕ k
             const owfOut = xorHex(r0.output, k32);
             steps1.push({ label: 'AES_k(0¹²⁸)', fn: 'AES encrypt', value: r0.output, desc: 'AES block evaluation' });
             steps1.push({ label: 'OWF(k)', fn: 'AES_k(0) ⊕ k', value: owfOut, desc: 'Davies-Meyer compression OWF' });
-          } else if (source === 'PRG') {
+          } else if (srcN === 'PRG') {
             const r1 = await api.prf.evaluate(k32, '1'.repeat(32));
             steps1.push({ label: 'F_k(0)', fn: 'AES_k(0)', value: r0.output, desc: 'PRF evaluation at 0' });
             steps1.push({ label: 'PRG(s)', fn: 'F_k(0)‖F_k(1)', value: r0.output + r1.output, desc: 'Length-doubling PRG' });
-          } else if (source === 'PRF') {
+          } else if (srcN === 'PRF') {
             steps1.push({ label: 'F_k(0)', fn: 'AES_k(0)', value: r0.output, desc: 'AES is directly a PRF' });
-          } else if (source === 'PRP') {
+          } else if (srcN === 'PRP') {
             steps1.push({ label: 'AES_k(0)', fn: 'AES-128', value: r0.output, desc: 'AES is a PRP (block cipher)' });
-          } else if (source === 'MAC') {
+          } else if (srcN === 'MAC') {
             steps1.push({ label: 'F_k(0)', fn: 'AES_k(0)', value: r0.output, desc: 'PRF basis for MAC' });
             const rm = await api.mac.sign(k32, qPad.slice(0, 32));
             steps1.push({ label: 'MAC_k(m)', fn: 'F_k(m)', value: rm.tag, desc: 'PRF-MAC: tag = AES_k(m)' });
-          } else if (source === 'CRHF') {
+          } else if (srcN === 'CRHF') {
             steps1.push({ label: 'F_k(0)', fn: 'PRF basis', value: r0.output, desc: 'PRF for MD compression' });
             const rmd = await api.hash.md(qShort);
             steps1.push({ label: 'H(m)', fn: 'MD[PRF]', value: rmd.digest, desc: 'Merkle-Damgård CRHF' });
-          } else if (source === 'HMAC') {
+          } else if (srcN === 'HMAC') {
             steps1.push({ label: 'F_k(0)', fn: 'PRF basis', value: r0.output, desc: 'Foundation for HMAC' });
             const rh = await api.hmac.sign(k16, qShort);
             steps1.push({ label: 'HMAC_k(m)', fn: 'H(k⊕opad‖H(k⊕ipad‖m))', value: rh.tag, desc: 'HMAC over PA#8 DLP hash' });
-          } else if (source === 'OWP') {
+          } else if (srcN === 'OWP') {
             steps1.push({ label: 'AES_k(m)', fn: 'AES-128 PRP', value: r0.output, desc: 'AES is a PRP — a bijection on {0,1}¹²⁸, i.e. a one-way permutation' });
-          } else if (source === 'CPA_ENC') {
+          } else if (srcN === 'CPA_ENC') {
             const rcpa = await api.enc.cpa(k32, qPad.slice(0, 32));
             steps1.push({ label: 'r (nonce)', fn: 'random', value: rcpa.r, desc: 'Random nonce r ← {0,1}ⁿ' });
             steps1.push({ label: 'CPA_Enc_k(m)', fn: 'F_k(r) ⊕ m', value: rcpa.ciphertext, desc: 'PRF → CPA: ciphertext = F_k(r) ⊕ m' });
-          } else if (source === 'CCA_ENC') {
+          } else if (srcN === 'CCA_ENC') {
             const rcca = await api.cca.encrypt(k16, k16, qPad.slice(0, 32));
             steps1.push({ label: 'r', fn: 'CPA nonce', value: rcca.r, desc: 'CPA inner layer: r ← {0,1}ⁿ' });
             steps1.push({ label: 'c', fn: 'CPA_Enc_kE(m)', value: rcca.ciphertext, desc: 'CPA ciphertext' });
             steps1.push({ label: 't', fn: 'MAC_kM(r‖c)', value: rcca.tag, desc: 'Encrypt-then-MAC integrity tag → IND-CCA2' });
           }
-        } catch (e) { steps1.push({ label: 'Error', fn: source, value: e.message, stub: true }); }
+        } catch (e) { steps1.push({ label: 'Error', fn: srcN, value: e.message, stub: true }); }
       } else {
         // DLP foundation
-        const xInput = keyHex.slice(0, 16).padEnd(16, '0');
+        const xInput = (effKey || '').slice(0, 16).padEnd(16, '0');
         steps1.push({ label: 'DLP input x', fn: 'g^x mod p', value: xInput, desc: 'Foundation (DLP OWF/OWP)' });
         try {
           const r = await api.owf.evaluate(xInput);
           const owfOut = r.output.replace(/^0x/, '');
           steps1.push({ label: 'OWF(x)', fn: 'g^x mod p', value: owfOut, desc: 'DLP one-way function output' });
-          if (source === 'PRG') {
-            const seedH = keyHex.slice(0, 8).padEnd(8, '0');
+          if (srcN === 'PRG') {
+            const seedH = (effKey || '').slice(0, 8).padEnd(8, '0');
             const rp = await api.prg.generate(seedH, 16);
             steps1.push({ label: 'PRG(s)', fn: 'HILL hard-core bits', value: rp.output_hex, desc: `Iterative hard-core bit extraction (ratio: ${(rp.ones_ratio*100).toFixed(1)}%)` });
-          } else if (source === 'CRHF') {
+          } else if (srcN === 'CRHF') {
             const rdlp = await api.hash.dlp(qShort);
             steps1.push({ label: 'DLPHash(m)', fn: 'g^x·ĥ^y mod p', value: rdlp.digest, desc: 'DLP-based CRHF (PA#8)' });
-          } else if (source === 'HMAC') {
+          } else if (srcN === 'HMAC') {
             const rh = await api.hmac.sign(k16, qShort);
             steps1.push({ label: 'HMAC_k(m)', fn: 'DLP hash in HMAC', value: rh.tag, desc: 'HMAC over DLP hash (PA#10)' });
-          } else if (source === 'OWP') {
+          } else if (srcN === 'OWP') {
             steps1.push({ label: 'OWP(x) = g^x mod p', fn: 'DLP OWP', value: owfOut, desc: 'g^x mod p is bijective on Z_q — directly a one-way permutation' });
-          } else if (source === 'CPA_ENC') {
+          } else if (srcN === 'CPA_ENC') {
             steps1.push({ label: 'DLP OWF', fn: 'g^x mod p', value: owfOut, desc: 'Foundation: DLP OWF' });
             steps1.push({ label: 'OWF → PRG → PRF → CPA', fn: 'multi-hop chain', value: '(HILL + GGM + nonce-enc)', stub: true, desc: 'DLP OWF → HILL PRG → GGM PRF → CPA encryption' });
-          } else if (source === 'CCA_ENC') {
+          } else if (srcN === 'CCA_ENC') {
             steps1.push({ label: 'DLP OWF', fn: 'g^x mod p', value: owfOut, desc: 'Foundation: DLP OWF' });
             steps1.push({ label: 'OWF → … → CCA', fn: 'multi-hop chain', value: '(HILL + GGM + EtM)', stub: true, desc: 'DLP OWF → HILL PRG → GGM PRF → CPA → Encrypt-then-MAC → IND-CCA2' });
-          } else if (source !== 'OWF') {
-            steps1.push({ label: source, fn: 'via OWF chain', value: '(multi-hop from DLP)', desc: `${source} built from DLP OWF via reduction chain` });
+          } else if (srcN !== 'OWF') {
+            steps1.push({ label: srcN, fn: 'via OWF chain', value: '(multi-hop from DLP)', desc: `${srcN} built from DLP OWF via reduction chain` });
           }
         } catch (e) { steps1.push({ label: 'Error', fn: 'DLP OWF', value: e.message, stub: true }); }
       }
       setBuildSteps(steps1);
 
       // Routing table lookup
-      const srcN = direction === 'backward' ? target : source;
-      const tgtN = direction === 'backward' ? source : target;
       const route = await api.reduce(srcN, tgtN, foundation).catch(() => null);
       setRouteInfo(route);
 
@@ -153,7 +157,7 @@ export default function App() {
       const steps2 = [];
       try {
         if (srcN === 'PRG' && tgtN === 'PRF') {
-          const bits = queryHex || '0'.repeat(8);
+          const bits = effQuery || '0'.repeat(8);
           const tree = await api.prf.ggm_tree(k32, bits.slice(0, 8).padEnd(8, '0'));
           steps2.push({ label: 'k (key)', fn: 'GGM root', value: k32.slice(0, 32), desc: 'Start at root' });
           (tree.path || []).forEach((p, i) => {
@@ -166,7 +170,7 @@ export default function App() {
           steps2.push({ label: 'Mac_k(m)', fn: 'F_k(m)', value: r.tag, desc: 'PRF-MAC: tag = F_k(m)' });
 
         } else if (srcN === 'OWF' && tgtN === 'PRG') {
-          const seedH = (queryHex || '').slice(0, 8).padEnd(8, '0');
+          const seedH = (effQuery || '').slice(0, 8).padEnd(8, '0');
           const rp = await api.prg.generate(seedH, 32);
           steps2.push({ label: 'seed s₀', fn: 'input', value: seedH, desc: 'Initial seed' });
           steps2.push({ label: 'OWF iterations', fn: 'f(f(…(s)…))', value: rp.output_hex.slice(0, 32) + '…', desc: 'Apply OWF to get s₁,s₂,…' });
@@ -240,7 +244,7 @@ export default function App() {
           steps2.push({ label: 'HMAC_k(m)', fn: 'double-hash', value: tag.tag, desc: 'PRF-MAC fits HMAC double-hash structure' });
 
         } else if (srcN === 'PRG' && tgtN === 'OWF') {
-          const seedH = (queryHex || '').slice(0, 8).padEnd(8, '0');
+          const seedH = (effQuery || '').slice(0, 8).padEnd(8, '0');
           const rp = await api.prg.generate(seedH, 32);
           steps2.push({ label: 'G(s)', fn: 'PRG output', value: rp.output_hex, desc: 'PRG is one-way: recovering s from G(s) breaks pseudorandomness' });
 
