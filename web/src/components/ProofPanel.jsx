@@ -16,10 +16,10 @@ const FOUNDATION_BUILDS = {
 const FOUNDATION_LABEL = { AES: 'AES (PRP)', DLP: 'DLP (OWF)' };
 
 const ROLE_STYLES = {
-  foundation: { bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.50)', color: 'var(--accent-orange)', dot: '#F59E0B' },
-  active:     { bg: 'rgba(79,108,247,0.12)',  border: 'rgba(79,108,247,0.55)',  color: 'var(--accent-blue)',   dot: '#4F6CF7' },
-  target:     { bg: 'rgba(34,197,94,0.10)',   border: 'rgba(34,197,94,0.50)',   color: 'var(--accent-green)',  dot: '#22C55E' },
-  neutral:    { bg: 'var(--bg-well)',          border: 'var(--border)',          color: 'var(--text-secondary)', dot: 'var(--text-muted)' },
+  foundation: { bg: 'rgba(180,83,9,0.12)',  border: 'rgba(180,83,9,0.55)',  color: 'var(--accent-orange)', dot: 'var(--accent-orange)' },
+  active:     { bg: 'rgba(59,86,245,0.12)', border: 'rgba(59,86,245,0.60)', color: 'var(--accent-blue)',   dot: 'var(--accent-blue)' },
+  target:     { bg: 'rgba(22,163,74,0.12)', border: 'rgba(22,163,74,0.55)', color: 'var(--accent-green)',  dot: 'var(--accent-green)' },
+  neutral:    { bg: 'var(--bg-well)',        border: 'var(--border)',         color: 'var(--text-secondary)', dot: 'var(--text-muted)' },
 };
 
 function Chip({ label, role }) {
@@ -27,12 +27,13 @@ function Chip({ label, role }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-      padding: '10px 20px', minWidth: 120,
-      borderRadius: 8, border: `1.5px solid ${s.border}`, background: s.bg,
+      padding: '10px 22px', minWidth: 128,
+      borderRadius: 9, border: `2px solid ${s.border}`, background: s.bg,
       flexShrink: 0, whiteSpace: 'nowrap',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
     }}>
-      <div style={{ width: 7, height: 7, borderRadius: '50%', background: s.dot, flexShrink: 0 }} />
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', fontWeight: 700, color: s.color, letterSpacing: '0.03em' }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.dot, flexShrink: 0, boxShadow: `0 0 0 2px ${s.border}` }} />
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.85rem', fontWeight: 800, color: s.color, letterSpacing: '0.03em' }}>
         {label}
       </span>
     </div>
@@ -79,23 +80,23 @@ function FlowDiagram({ nodes, activeSource, activeTarget }) {
         return (
           <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', width: 130, flexShrink: 0 }}>
             {/* theorem label row */}
-            <div style={{ height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+            <div style={{ height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
               <span style={{
-                fontFamily: 'var(--font-mono)', fontSize: '0.58rem', fontWeight: 600,
+                fontFamily: 'var(--font-mono)', fontSize: '0.62rem', fontWeight: 700,
                 color: 'var(--accent-orange)',
-                background: 'rgba(245,158,11,0.08)',
-                border: '1px solid rgba(245,158,11,0.22)',
-                borderRadius: 4, padding: '2px 7px',
+                background: 'var(--accent-orange-bg)',
+                border: '1.5px solid rgba(180,83,9,0.30)',
+                borderRadius: 5, padding: '2px 8px',
                 whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                maxWidth: 118, display: 'block', textAlign: 'center',
+                maxWidth: 122, display: 'block', textAlign: 'center',
               }} title={item.theorem}>
                 {item.theorem}
               </span>
             </div>
-            {/* arrow line — must align vertically with center of chips */}
+            {/* arrow line */}
             <div style={{ display: 'flex', alignItems: 'center', width: '100%', height: 40 }}>
-              <div style={{ flex: 1, height: 2, background: 'linear-gradient(to right, #9BA5D4, #4F6CF7)' }} />
-              <div style={{ width: 0, height: 0, borderTop: '6px solid transparent', borderBottom: '6px solid transparent', borderLeft: '10px solid #4F6CF7', flexShrink: 0 }} />
+              <div style={{ flex: 1, height: 2.5, background: 'linear-gradient(to right, var(--border), var(--accent-blue))' }} />
+              <div style={{ width: 0, height: 0, borderTop: '7px solid transparent', borderBottom: '7px solid transparent', borderLeft: '11px solid var(--accent-blue)', flexShrink: 0 }} />
             </div>
           </div>
         );
@@ -147,7 +148,7 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
   return (
     <div style={{
       background: 'var(--bg-card)',
-      border: '1px solid var(--border-light)',
+      border: '1.5px solid var(--border)',
       borderRadius: 'var(--radius-md)',
       boxShadow: 'var(--shadow-card)',
       overflow: 'hidden',
@@ -165,21 +166,21 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(79,108,247,0.10)', border: '1px solid rgba(79,108,247,0.20)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4F6CF7" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent-blue-bg)', border: '1.5px solid rgba(59,86,245,0.30)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-primary)' }}>
+          <span style={{ fontSize: '0.77rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-primary)' }}>
             Reduction Proof
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 4, fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-          <span style={{ color: 'var(--accent-orange)', fontWeight: 600 }}>{foundLabel}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 4, fontFamily: 'var(--font-mono)', fontSize: '0.77rem', color: 'var(--text-muted)' }}>
+          <span style={{ color: 'var(--accent-orange)', fontWeight: 700 }}>{foundLabel}</span>
           <span>→</span>
-          <span style={{ color: 'var(--accent-blue)', fontWeight: 600 }}>{srcN}</span>
-          {tgtN && tgtN !== srcN && <><span>→</span><span style={{ color: 'var(--accent-green)', fontWeight: 600 }}>{tgtN}</span></>}
+          <span style={{ color: 'var(--accent-blue)', fontWeight: 700 }}>{srcN}</span>
+          {tgtN && tgtN !== srcN && <><span>→</span><span style={{ color: 'var(--accent-green)', fontWeight: 700 }}>{tgtN}</span></>}
         </div>
 
         {routeInfo?.theorem && routeInfo.supported !== false && (
@@ -204,31 +205,31 @@ export default function ProofPanel({ open, setOpen, foundation, source, target, 
 
           {securitySummary && (
             <div style={{
-              display: 'flex', gap: 10, alignItems: 'flex-start',
-              padding: '10px 14px', marginTop: 16,
-              background: 'rgba(79,108,247,0.05)',
-              border: '1px solid rgba(79,108,247,0.15)',
-              borderRadius: 8,
+              display: 'flex', gap: 12, alignItems: 'flex-start',
+              padding: '12px 16px', marginTop: 16,
+              background: 'var(--accent-blue-bg)',
+              border: '1.5px solid rgba(59,86,245,0.25)',
+              borderRadius: 9,
             }}>
-              <div style={{ width: 18, height: 18, borderRadius: 5, background: 'rgba(79,108,247,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4F6CF7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <div style={{ width: 20, height: 20, borderRadius: 6, background: 'var(--accent-blue-bg)', border: '1.5px solid rgba(59,86,245,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--accent-blue)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-blue)', marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Security Chain</div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{securitySummary}</div>
+                <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-blue)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Security Chain</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', lineHeight: 1.65, fontWeight: 500 }}>{securitySummary}</div>
               </div>
             </div>
           )}
 
           {routeInfo?.supported === false && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', marginTop: 12, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, fontSize: '0.76rem', color: 'var(--accent-orange)' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', marginTop: 12, background: 'var(--accent-orange-bg)', border: '1.5px solid rgba(180,83,9,0.35)', borderRadius: 8, fontSize: '0.78rem', color: 'var(--accent-orange)', fontWeight: 600 }}>
               ⚠ No direct reduction path from <strong style={{ margin: '0 3px' }}>{srcN}</strong> to <strong style={{ margin: '0 3px' }}>{tgtN}</strong>. Try swapping or using B→A.
             </div>
           )}
 
-          <div style={{ marginTop: 14, fontSize: '0.68rem', color: 'var(--text-muted)', textAlign: 'center', fontStyle: 'italic' }}>
+          <div style={{ marginTop: 14, fontSize: '0.70rem', color: 'var(--text-muted)', textAlign: 'center', fontStyle: 'italic', fontWeight: 500 }}>
             All intermediate values computed live from your PA#1–#20 implementations.
           </div>
         </div>
