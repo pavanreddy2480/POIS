@@ -628,9 +628,17 @@ select {
   border-radius: var(--radius);
   padding: 8px;
   border: 1px solid var(--border);
-  min-height: 80px;
+  /* Fixed height prevents layout jitter when steps clear between runs */
+  height: 224px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
   backdrop-filter: blur(8px);
 }
+
+.step-chain::-webkit-scrollbar { width: 3px; }
+.step-chain::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .step-item {
   display: flex;
