@@ -2,17 +2,18 @@ import React, { useState } from 'react';
 
 const PA_NUMS = { OWF: 1, OWP: 1, PRG: 1, PRF: 2, PRP: 4, MAC: 5, CRHF: '7+8', HMAC: 10, CPA_ENC: 3, CCA_ENC: 6 };
 
-export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, onRun, direction }) {
+export default function ReducePanel({ source, target, setTarget, primitives, queryHex, setQueryHex, steps, routeInfo, loading, onRun, direction }) {
   const [busy, setBusy] = useState(false);
   const handleRun = async () => {
     setBusy(true);
     try { await onRun(); } finally { setBusy(false); }
   };
+  const isComputing = busy || loading;
   return (
     <div className="column-panel">
       <div className="column-header">
         <h2 className="col2-header">Reduction</h2>
-        <span className="col-badge">{source} → {target}</span>
+        <span className="col-badge">Leg 2: {source} → {target}</span>
       </div>
 
       <div className="form-group">
@@ -39,7 +40,7 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
         <div style={{ marginBottom: 10 }}>
           {routeInfo.supported === false
             ? <span className="badge badge-warn">⚠ {source} → {target}: {routeInfo.steps?.[0]}</span>
-            : <span className="badge badge-secure">✓ {routeInfo.theorem || `${source}→${target}`}</span>
+            : <span className="badge badge-secure">✓ {routeInfo.direction === 'backward' ? `${source} → ${target}` : (routeInfo.theorem || `${source}→${target}`)}{routeInfo.direction === 'multi-hop' ? ' (multi-hop)' : ''}</span>
           }
         </div>
       )}
@@ -51,29 +52,40 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
             A is a black box here
           </span>
         </label>
-        <div className="step-chain">
-          {steps.length === 0 && (
+        <div className={`step-chain${isComputing && steps.length === 0 ? ' loading' : ''}`}>
+          {steps.length === 0 && !isComputing && (
             <div className="step-item">
               <span className="step-stub">Select source/target and enter query</span>
             </div>
           )}
+          {steps.length === 0 && isComputing && (
+            <div className="step-item">
+              <span className="spinner" style={{ marginRight: 8 }} />
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.76rem' }}>Computing…</span>
+            </div>
+          )}
           {steps.map((s, i) => (
-            <div className="step-item" key={i}>
+            <div className="step-item" key={i} title={s.desc || ''}>
               <span className="step-label">{s.label}</span>
               <span className="step-arrow">→</span>
               <span className="step-fn">{s.fn}</span>
               <span className="step-arrow">=</span>
               {s.stub
                 ? <span className="step-stub">{s.value}</span>
-                : <span className="step-value">{typeof s.value === 'string' ? s.value.slice(0, 40) + (s.value.length > 40 ? '…' : '') : s.value}</span>
+                : <span className="step-value">{typeof s.value === 'string' ? s.value.slice(0, 32) + (s.value.length > 32 ? '…' : '') : s.value}</span>
               }
+              {s.desc && (
+                <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0, maxWidth: '35%', textAlign: 'right', lineHeight: 1.3 }}>
+                  {s.desc}
+                </span>
+              )}
             </div>
           ))}
         </div>
       </div>
 
-      <button className="btn btn-primary" onClick={handleRun} disabled={busy} style={{ width: '100%', marginTop: 4 }}>
-        ▶ Run Reduction
+      <button className="btn btn-primary" onClick={handleRun} disabled={isComputing} style={{ width: '100%', marginTop: 4 }}>
+        {isComputing ? <><span className="spinner" />Computing…</> : '▶ Run Reduction'}
       </button>
     </div>
   );

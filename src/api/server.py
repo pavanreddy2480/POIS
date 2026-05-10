@@ -1847,11 +1847,11 @@ ROUTING_TABLE = {
         "security_claim": "If adversary breaks PRG with advantage ε, it breaks OWF with advantage ε' ≥ ε/n",
     },
     ("OWF", "OWP"): {
-        "steps": ["OWF → OWP (DLP: f(x)=g^x mod p is a OWP on Z_q)"],
-        "theorem": "DLP OWP",
+        "steps": ["OWF → OWP: AES is a PRP (bijection) → AES_k is OWP; DLP: g^x mod p is bijective on Z_q"],
+        "theorem": "PRP = OWP",
         "pa": "PA#1",
         "direction": "forward",
-        "security_claim": "f(x)=g^x mod p is both one-way and a permutation on Z_q under DLP",
+        "security_claim": "AES: AES_k is a PRP (bijection) → one-way permutation. DLP: g^x mod p is bijective on Z_q → OWP under discrete log hardness.",
     },
     ("PRG", "PRF"): {
         "steps": ["PRG → PRF (GGM tree construction)"],
@@ -1980,6 +1980,20 @@ ROUTING_TABLE = {
         "direction": "backward",
         "security_claim": "Any OWF-inverter immediately inverts the OWP; OWP security is a special case of OWF security",
     },
+    ("PRG", "OWP"): {
+        "steps": ["PRG → PRF (GGM)", "PRF → PRP (Luby-Rackoff)", "PRP with fixed key is bijective → OWP"],
+        "theorem": "PRG → PRP → OWP",
+        "pa": "PA#1, PA#2, PA#4",
+        "direction": "backward",
+        "security_claim": "PRG seeds GGM tree → PRF; Luby-Rackoff Feistel constructs PRP from PRF; PRP_k with fixed key k is a bijection and hard to invert → OWP. Breaking OWP would break PRG pseudorandomness.",
+    },
+    ("PRF", "OWP"): {
+        "steps": ["PRF → PRP (Luby-Rackoff 3-round Feistel)", "PRP_k with fixed key k is bijective → OWP"],
+        "theorem": "PRF → PRP → OWP",
+        "pa": "PA#2, PA#4",
+        "direction": "backward",
+        "security_claim": "Luby-Rackoff constructs a PRP from the PRF; a PRP with fixed key is a bijection on {0,1}^n and hard to invert under PRF hardness → it is an OWP.",
+    },
     ("CPA_ENC", "PRF"): {
         "steps": ["CPA_ENC → PRF: distinguishing ciphertexts F_k(r)⊕m from uniform implies a PRF distinguisher"],
         "theorem": "IND-CPA ⇒ PRF Security (contrapositive)",
@@ -2018,56 +2032,111 @@ ROUTING_TABLE = {
     # ── Multi-hop paths ───────────────────────────────────────────────────
     ("OWF", "PRF"): {
         "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)"],
-        "theorem": "OWF → PRG → PRF (HILL + GGM)",
+        "path": ["OWF", "PRG", "PRF"],
+        "theorem": "HILL + GGM",
         "pa": "PA#1, PA#2",
         "direction": "forward",
         "security_claim": "OWF is the minimal assumption for PRF existence",
     },
     ("OWF", "MAC"): {
-        "steps": ["OWF → PRG → PRF → MAC"],
-        "theorem": "OWF → MAC",
+        "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)", "PRF → MAC"],
+        "path": ["OWF", "PRG", "PRF", "MAC"],
+        "theorem": "HILL + GGM + PRF-MAC",
         "pa": "PA#1, PA#2, PA#5",
         "direction": "forward",
         "security_claim": "MAC can be built from any OWF",
     },
+    ("OWF", "CCA_ENC"): {
+        "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)", "PRF → CPA-Enc", "CPA-Enc + MAC → CCA (Encrypt-then-MAC)"],
+        "path": ["OWF", "PRG", "PRF", "CPA_ENC", "CCA_ENC"],
+        "theorem": "HILL + GGM + PRF→CPA + Enc-then-MAC",
+        "pa": "PA#1, PA#2, PA#3, PA#6",
+        "direction": "forward",
+        "security_claim": "OWF is the minimal assumption for IND-CCA2: OWF→PRG (HILL)→PRF (GGM)→IND-CPA→IND-CCA2 (Encrypt-then-MAC).",
+    },
+    ("OWF", "HMAC"): {
+        "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)", "PRF → MAC (PRF-MAC)", "MAC → HMAC (double-hash structure)"],
+        "path": ["OWF", "PRG", "PRF", "MAC", "HMAC"],
+        "theorem": "HILL + GGM + PRF-MAC + HMAC",
+        "pa": "PA#1, PA#2, PA#5, PA#10",
+        "direction": "forward",
+        "security_claim": "HMAC is reachable from any OWF: OWF→PRG (HILL)→PRF (GGM)→MAC (PRF-MAC)→HMAC (double-hash). OWF is the minimal hardness assumption for the full chain.",
+    },
     ("OWF", "PRP"): {
-        "steps": ["OWF → PRG → PRF → PRP (Luby-Rackoff)"],
-        "theorem": "OWF → PRP",
+        "steps": ["OWF → PRG (HILL)", "PRG → PRF (GGM)", "PRF → PRP (Luby-Rackoff)"],
+        "path": ["OWF", "PRG", "PRF", "PRP"],
+        "theorem": "HILL + GGM + Luby-Rackoff",
         "pa": "PA#1, PA#2, PA#4",
         "direction": "forward",
         "security_claim": "Block ciphers (PRPs) exist if OWFs exist",
     },
     ("PRG", "MAC"): {
         "steps": ["PRG → PRF (GGM)", "PRF → MAC"],
-        "theorem": "PRG → MAC",
+        "path": ["PRG", "PRF", "MAC"],
+        "theorem": "GGM + PRF-MAC",
         "pa": "PA#2, PA#5",
         "direction": "forward",
         "security_claim": "PRG suffices for MAC construction",
     },
     ("PRG", "PRP"): {
         "steps": ["PRG → PRF (GGM)", "PRF → PRP (Luby-Rackoff)"],
-        "theorem": "PRG → PRP",
+        "path": ["PRG", "PRF", "PRP"],
+        "theorem": "GGM + Luby-Rackoff",
         "pa": "PA#2, PA#4",
         "direction": "forward",
         "security_claim": "PRG suffices for PRP (block cipher) construction",
     },
     ("OWP", "PRG"): {
-        "steps": ["OWP → OWF (any OWP is a OWF)", "OWF → PRG (HILL)"],
-        "theorem": "OWP → OWF → PRG",
+        "steps": ["OWP → OWF (OWP ⊆ OWF)", "OWF → PRG (HILL)"],
+        "path": ["OWP", "OWF", "PRG"],
+        "theorem": "OWP ⊆ OWF + HILL",
         "pa": "PA#1",
         "direction": "forward",
         "security_claim": "OWP is a special case of OWF",
     },
     ("OWP", "PRF"): {
-        "steps": ["OWP → OWF", "OWF → PRG (HILL)", "PRG → PRF (GGM)"],
-        "theorem": "OWP → PRF",
+        "steps": ["OWP → PRF (GGM: OWP's hard-core bits directly seed GGM tree)"],
+        "theorem": "OWP → PRF (GGM)",
         "pa": "PA#1, PA#2",
         "direction": "forward",
-        "security_claim": "OWP implies PRF via HILL construction",
+        "security_claim": "OWP is a bijective OWF; its outputs directly seed the GGM construction to yield a PRF. Breaking OWP breaks PRF.",
+    },
+    ("OWP", "PRP"): {
+        "steps": ["OWP → PRF (GGM)", "PRF → PRP (Luby-Rackoff 3-round Feistel)"],
+        "path": ["OWP", "PRF", "PRP"],
+        "theorem": "GGM + Luby-Rackoff",
+        "pa": "PA#1, PA#2, PA#4",
+        "direction": "forward",
+        "security_claim": "OWP seeds GGM tree → PRF; 3-round Luby-Rackoff Feistel builds secure PRP from PRF. Breaking OWP breaks PRF, which breaks PRP.",
+    },
+    ("OWP", "MAC"): {
+        "steps": ["OWP → PRF (GGM)", "PRF → MAC (PRF-MAC)"],
+        "path": ["OWP", "PRF", "MAC"],
+        "theorem": "OWP → PRF → MAC",
+        "pa": "PA#1, PA#2, PA#5",
+        "direction": "forward",
+        "security_claim": "OWP is a bijective OWF; GGM seeds a PRF from OWP; PRF-MAC (tag = F_k(m)) is EUF-CMA secure.",
+    },
+    ("OWP", "HMAC"): {
+        "steps": ["OWP → PRF (GGM)", "PRF → MAC (PRF-MAC)", "MAC → HMAC (double-hash)"],
+        "path": ["OWP", "PRF", "MAC", "HMAC"],
+        "theorem": "OWP → PRF → MAC → HMAC",
+        "pa": "PA#1, PA#2, PA#5, PA#10",
+        "direction": "forward",
+        "security_claim": "OWP → PRF (GGM) → MAC (PRF-MAC) → HMAC (double-hash structure). HMAC security rests on OWP hardness.",
+    },
+    ("OWP", "CCA_ENC"): {
+        "steps": ["OWP → PRF (GGM)", "PRF → CPA-Enc", "CPA-Enc + MAC → CCA (Encrypt-then-MAC)"],
+        "path": ["OWP", "PRF", "CPA_ENC", "CCA_ENC"],
+        "theorem": "OWP → PRF → CPA → CCA",
+        "pa": "PA#1, PA#2, PA#3, PA#6",
+        "direction": "forward",
+        "security_claim": "OWP → PRF (GGM) → IND-CPA (PA#3) → Encrypt-then-MAC → IND-CCA2 (PA#6).",
     },
     ("CRHF", "MAC"): {
         "steps": ["CRHF → HMAC (compression function)", "HMAC → MAC (EUF-CMA)"],
-        "theorem": "CRHF → MAC",
+        "path": ["CRHF", "HMAC", "MAC"],
+        "theorem": "HMAC Security + EUF-CMA",
         "pa": "PA#10",
         "direction": "forward",
         "security_claim": "HMAC builds a secure MAC from any CRHF",
@@ -2086,17 +2155,39 @@ def reduce_all():
         })
     return {"reductions": result, "count": len(result)}
 
+def _build_hop_details(path):
+    """Return per-hop theorem/security for each edge in path."""
+    details = []
+    for i in range(len(path) - 1):
+        k = (path[i], path[i + 1])
+        hop = ROUTING_TABLE.get(k, {})
+        details.append({
+            "from": path[i],
+            "to": path[i + 1],
+            "theorem": hop.get("theorem", f"{path[i]}→{path[i+1]}"),
+            "security_claim": hop.get("security_claim", ""),
+            "pa": hop.get("pa", ""),
+        })
+    return details
+
+
 @app.post("/api/reduce")
 def reduce_query(req: ReduceRequest):
     key = (req.source.upper(), req.target.upper())
     if key in ROUTING_TABLE:
-        return ROUTING_TABLE[key]
+        entry = {**ROUTING_TABLE[key], "supported": True}
+        if "path" in entry and len(entry["path"]) > 1:
+            entry["hop_details"] = _build_hop_details(entry["path"])
+        return entry
     # Check reverse
     rev_key = (req.target.upper(), req.source.upper())
     if rev_key in ROUTING_TABLE:
         entry = dict(ROUTING_TABLE[rev_key])
         entry["direction"] = "backward"
+        entry["supported"] = True
         entry["note"] = f"Backward reduction: {req.target} ⇒ {req.source}"
+        if "path" in entry and len(entry["path"]) > 1:
+            entry["hop_details"] = _build_hop_details(entry["path"])
         return entry
     # Try multi-hop BFS
     graph = {}
@@ -2114,8 +2205,16 @@ def reduce_query(req: ReduceRequest):
                 k = (path[i], path[i+1])
                 if k in ROUTING_TABLE:
                     steps.extend(ROUTING_TABLE[k]["steps"])
-            return {"source": src, "target": tgt, "path": path, "steps": steps,
-                    "direction": "multi-hop", "supported": True}
+            hop_details = _build_hop_details(path)
+            last_entry = ROUTING_TABLE.get((path[-2], path[-1]), {}) if len(path) >= 2 else {}
+            return {
+                "source": src, "target": tgt, "path": path, "steps": steps,
+                "direction": "multi-hop", "supported": True,
+                "hop_details": hop_details,
+                "theorem": " → ".join(h["theorem"] for h in hop_details if h["theorem"]) or "Multi-hop reduction",
+                "security_claim": last_entry.get("security_claim", ""),
+                "pa": last_entry.get("pa", ""),
+            }
         for nxt in graph.get(node, []):
             if nxt not in visited:
                 visited.add(nxt)

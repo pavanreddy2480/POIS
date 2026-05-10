@@ -50,7 +50,7 @@ export default function DemoSection({
   foundation, source, setSource, target, setTarget,
   primitives, keyHex, setKeyHex, queryHex, setQueryHex,
   buildSteps, reduceSteps, routeInfo,
-  proofOpen, setProofOpen, direction, proofChain, onRun,
+  proofOpen, setProofOpen, direction, loading, onRun,
   onActiveChange,
 }) {
   const [active, setActive] = useState(() => localStorage.getItem('activeDemo') || 'home');
@@ -167,6 +167,7 @@ export default function DemoSection({
               keyHex={direction === 'backward' ? queryHex : keyHex}
               setKeyHex={direction === 'backward' ? setQueryHex : setKeyHex}
               steps={buildSteps}
+              loading={loading}
               onRun={onRun}
             />
             <ReducePanel
@@ -178,6 +179,7 @@ export default function DemoSection({
               setQueryHex={direction === 'backward' ? setKeyHex : setQueryHex}
               steps={reduceSteps}
               routeInfo={routeInfo}
+              loading={loading}
               onRun={onRun}
               direction={direction}
             />
@@ -188,7 +190,6 @@ export default function DemoSection({
               source={source}
               target={target}
               direction={direction}
-              proofChain={proofChain}
               routeInfo={routeInfo}
             />
           </div>

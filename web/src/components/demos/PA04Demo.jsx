@@ -331,7 +331,13 @@ export default function PA4Demo() {
                 <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', fontWeight: 700, marginBottom: 6 }}>
                   ⚡ OFB Keystream Reuse Attack
                 </div>
-                <BlockChain mode="OFB" result={result2} onFlip={null} flipResult={null} matchingBlocks={[]} />
+                <BlockChain mode="OFB" result={result2} onFlip={null} flipResult={null} matchingBlocks={matchingBlocks} />
+                {matchingBlocks.length > 0 && (
+                  <div style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--accent-red)' }}>
+                    ⚠ Block{matchingBlocks.length > 1 ? 's' : ''} {matchingBlocks.map(i => i+1).join(', ')} have identical ciphertexts
+                    — IV reuse reveals which plaintext blocks match between messages!
+                  </div>
+                )}
                 {result2.xorResult && (
                   <div style={{ marginTop: 10, padding: 10, background: 'rgba(231,76,60,0.06)',
                     border: '1px solid rgba(231,76,60,0.25)', borderRadius: 6 }}>
