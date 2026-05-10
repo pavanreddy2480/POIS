@@ -69,13 +69,13 @@ function MalleabilityTab() {
       <div className="demo-row">
         <div className="demo-half broken">
           <h5>⚠ CPA-Only (malleable)</h5>
-          {cpa && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cpa.ciphertext?.slice(0,32)}…</div>}
+          {cpa && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem', wordBreak: 'break-all' }}>CT: {cpa.ciphertext}</div>}
           <button className="btn btn-danger" onClick={()=>flipAndDecrypt('cpa')} disabled={!cpa || loading}>{'Flip bit & Decrypt'}</button>
           {cpa?.flippedDec && <div style={{ marginTop: 8 }}><div className="hex-display red">Corrupted PT: {cpa.flippedDec}</div><span className="badge badge-broken" style={{ marginTop: 6 }}>Malleability demonstrated!</span></div>}
         </div>
         <div className="demo-half secure">
           <h5>✓ CCA / Encrypt-then-MAC</h5>
-          {cca && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem' }}>CT: {cca.ciphertext?.slice(0,32)}… | Tag: {cca.tag?.slice(0,16)}…</div>}
+          {cca && <div className="hex-display dim" style={{ marginBottom: 8, fontSize: '0.7rem', wordBreak: 'break-all' }}>CT: {cca.ciphertext} | Tag: {cca.tag}</div>}
           <button className="btn btn-success" onClick={()=>flipAndDecrypt('cca')} disabled={!cca || loading}>{'Flip bit & Try Decrypt'}</button>
           {cca?.rejected && <div style={{ marginTop: 8 }}><div className="hex-display blue">Result: ⊥ (MAC verification failed)</div><span className="badge badge-secure" style={{ marginTop: 6 }}>CCA attack rejected!</span></div>}
           {cca?.flippedDec && <div style={{ marginTop: 8 }}><div className="hex-display red">Decrypted: {cca.flippedDec}</div></div>}

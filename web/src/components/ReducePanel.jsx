@@ -72,7 +72,7 @@ export default function ReducePanel({ source, target, setTarget, primitives, que
               <span className="step-arrow">=</span>
               {s.stub
                 ? <span className="step-stub">{s.value}</span>
-                : <span className="step-value">{typeof s.value === 'string' ? s.value.slice(0, 32) + (s.value.length > 32 ? '…' : '') : s.value}</span>
+                : <span className="step-value" style={{ wordBreak: 'break-all' }}>{s.value}</span>
               }
               {s.desc && (
                 <span style={{ marginLeft: 'auto', fontSize: '0.65rem', color: 'var(--text-muted)', fontStyle: 'italic', flexShrink: 0, maxWidth: '35%', textAlign: 'right', lineHeight: 1.3 }}>

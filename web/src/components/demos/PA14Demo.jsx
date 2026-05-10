@@ -55,9 +55,8 @@ export default function PA14Demo() {
     setLoading(false);
   }
 
-  function trunc(s, n = 22) {
-    if (!s) return '';
-    return s.length > n ? s.slice(0, n) + '…' : s;
+  function trunc(s) {
+    return s ? String(s) : '';
   }
 
   return (
@@ -136,11 +135,11 @@ export default function PA14Demo() {
                   <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', fontWeight: 700, marginBottom: 6 }}>
                     Recipient {i + 1}
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 3 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>N{i+1} =</span> {trunc(N, 18)}
+                  <div style={{ fontSize: '0.62rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 3, wordBreak: 'break-all' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>N{i+1} =</span> {trunc(N)}
                   </div>
-                  <div style={{ fontSize: '0.62rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: pkcs ? 8 : 0 }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>c{i+1} =</span> {trunc(result.ciphertexts[i], 18)}
+                  <div style={{ fontSize: '0.62rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: pkcs ? 8 : 0, wordBreak: 'break-all' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>c{i+1} =</span> {trunc(result.ciphertexts[i])}
                   </div>
                   {pkcs && result.padded_ems && (
                     <div style={{ borderTop: '1px solid var(--border)', paddingTop: 6 }}>
@@ -175,7 +174,7 @@ export default function PA14Demo() {
               <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', lineHeight: 1.7 }}>
                 <div>CRT(c₁, c₂, c₃) mod N₁N₂N₃</div>
                 <div style={{ color: 'var(--text-primary)', wordBreak: 'break-all', marginTop: 2 }}>
-                  = {trunc(result.m_cubed, 60)}
+                  = {trunc(result.m_cubed)}
                 </div>
                 <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>
                   {pkcs
@@ -212,7 +211,7 @@ export default function PA14Demo() {
             <div style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', marginBottom: 10 }}>
               <div>∛(CRT result) =</div>
               <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: '0.8rem', marginTop: 4, wordBreak: 'break-all' }}>
-                {trunc(result.recovered, 50)}
+                {trunc(result.recovered)}
               </div>
               {!result.attack_succeeded && (
                 <div style={{ fontSize: '0.62rem', color: 'var(--text-muted)', marginTop: 4 }}>

@@ -118,15 +118,30 @@ function BlockChain({ mode, result, onFlip, flipResult, matchingBlocks }) {
       {/* Intermediate value table */}
       <div style={{ marginTop: 10, fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
         {blocks.map((block, i) => (
-          <div key={i} style={{ padding: '2px 0', borderTop: i === 0 ? '1px solid var(--border)' : 'none' }}>
+          <div key={i} style={{ padding: '6px 0', borderTop: '1px solid var(--border-light)' }}>
+            <div style={{ fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>Block {i+1}</div>
             {mode === 'CBC' && (
-              <span>Block {i+1}: M={block.plaintext.slice(0,8)}… ⊕ prev={block.prev.slice(0,8)}… → xor={block.xor_input.slice(0,8)}… → C={block.ciphertext.slice(0,8)}…</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 8px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>M =</span><span style={{ wordBreak: 'break-all' }}>{block.plaintext}</span>
+                <span style={{ color: 'var(--text-muted)' }}>prev =</span><span style={{ wordBreak: 'break-all' }}>{block.prev}</span>
+                <span style={{ color: 'var(--text-muted)' }}>M ⊕ prev =</span><span style={{ wordBreak: 'break-all' }}>{block.xor_input}</span>
+                <span style={{ color: 'var(--accent-green)' }}>C =</span><span style={{ wordBreak: 'break-all', color: 'var(--accent-green)' }}>{block.ciphertext}</span>
+              </div>
             )}
             {mode === 'OFB' && (
-              <span>Block {i+1}: ks={block.keystream_state.slice(0,8)}… ⊕ M={block.plaintext.slice(0,8)}… → C={block.ciphertext.slice(0,8)}…</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 8px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>ks =</span><span style={{ wordBreak: 'break-all' }}>{block.keystream_state}</span>
+                <span style={{ color: 'var(--text-muted)' }}>M =</span><span style={{ wordBreak: 'break-all' }}>{block.plaintext}</span>
+                <span style={{ color: 'var(--accent-green)' }}>C =</span><span style={{ wordBreak: 'break-all', color: 'var(--accent-green)' }}>{block.ciphertext}</span>
+              </div>
             )}
             {mode === 'CTR' && (
-              <span>Block {i+1}: ctr={block.counter.slice(0,8)}… → ks={block.keystream.slice(0,8)}… ⊕ M={block.plaintext.slice(0,8)}… → C={block.ciphertext.slice(0,8)}…</span>
+              <div style={{ display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 8px' }}>
+                <span style={{ color: 'var(--text-muted)' }}>ctr =</span><span style={{ wordBreak: 'break-all' }}>{block.counter}</span>
+                <span style={{ color: 'var(--text-muted)' }}>ks =</span><span style={{ wordBreak: 'break-all' }}>{block.keystream}</span>
+                <span style={{ color: 'var(--text-muted)' }}>M =</span><span style={{ wordBreak: 'break-all' }}>{block.plaintext}</span>
+                <span style={{ color: 'var(--accent-green)' }}>C =</span><span style={{ wordBreak: 'break-all', color: 'var(--accent-green)' }}>{block.ciphertext}</span>
+              </div>
             )}
           </div>
         ))}

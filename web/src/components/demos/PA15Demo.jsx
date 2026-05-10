@@ -63,7 +63,7 @@ export default function PA15Demo() {
             <div className="step-item">
               <span className="step-label">Signature σ = H(m)^d</span>
               <span className="hex-display" style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>
-                {String(result.signature || '').slice(0, 80)}…
+                {String(result.signature || '')}
               </span>
             </div>
             <div className="step-item">

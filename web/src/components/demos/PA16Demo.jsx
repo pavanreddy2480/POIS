@@ -10,7 +10,7 @@ function KeyRow({ label, val, accent }) {
     <div style={{ fontSize: '0.61rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 3, display: 'flex', gap: 6 }}>
       <span style={{ color: 'var(--text-secondary)', minWidth: 56, flexShrink: 0 }}>{label} =</span>
       <span style={{ color: accent || 'var(--text-primary)', wordBreak: 'break-all' }}>
-        {s.length > 22 ? s.slice(0, 22) + '…' : s}
+        {s}
       </span>
     </div>
   );
@@ -86,9 +86,8 @@ export default function PA16Demo() {
     setCpaLoading(false);
   }
 
-  function trunc(s, n = 20) {
-    s = String(s ?? '');
-    return s.length > n ? s.slice(0, n) + '…' : s;
+  function trunc(s) {
+    return String(s ?? '');
   }
 
   const kLabel = result?.multiplier ?? k;
@@ -188,8 +187,8 @@ export default function PA16Demo() {
                 Enc(pk, m) = (c₁, c₂)
               </div>
               <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', lineHeight: 1.9 }}>
-                <div>c₁ = g^r mod p &nbsp;= <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c1, 22)}</span></div>
-                <div>c₂ = m·h^r mod p = <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c2, 22)}</span></div>
+                <div style={{ wordBreak: 'break-all' }}>c₁ = g^r mod p &nbsp;= <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c1)}</span></div>
+                <div style={{ wordBreak: 'break-all' }}>c₂ = m·h^r mod p = <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c2)}</span></div>
               </div>
               <div style={{ marginTop: 8, fontSize: '0.72rem' }}>
                 Honest Dec(sk, c₁, c₂) ={' '}
@@ -217,9 +216,9 @@ export default function PA16Demo() {
                 Attacker: c₂' = {kLabel}·c₂ mod p
               </div>
               <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', lineHeight: 1.9 }}>
-                <div>c₁' = c₁ = <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c1, 22)}</span>
+                <div style={{ wordBreak: 'break-all' }}>c₁' = c₁ = <span style={{ color: 'var(--text-primary)' }}>{trunc(result.c1)}</span>
                   <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>(unchanged)</span></div>
-                <div>c₂' = {kLabel}·c₂ mod p = <span style={{ color: 'var(--accent-orange)', fontWeight: 600 }}>{trunc(result.c2_prime, 22)}</span></div>
+                <div style={{ wordBreak: 'break-all' }}>c₂' = {kLabel}·c₂ mod p = <span style={{ color: 'var(--accent-orange)', fontWeight: 600 }}>{trunc(result.c2_prime)}</span></div>
               </div>
               <div style={{ marginTop: 8, fontSize: '0.68rem', color: 'var(--text-muted)' }}>
                 (c₁', c₂') is a valid ElGamal ciphertext — constructed without knowing sk or r.
@@ -319,10 +318,10 @@ export default function PA16Demo() {
                   </div>
                   <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', lineHeight: 1.9 }}>
                     <div>Challenge m = <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{cpaResult.cca_demo.m}</span></div>
-                    <div>Enc(pk, m) → c₁ = {trunc(cpaResult.cca_demo.c1, 20)}</div>
+                    <div style={{ wordBreak: 'break-all' }}>Enc(pk, m) → c₁ = {trunc(cpaResult.cca_demo.c1)}</div>
                     <div>Attacker submits (c₁, 2·c₂) to oracle:</div>
-                    <div style={{ paddingLeft: 12 }}>
-                      c₂' = 2·c₂ mod p = {trunc(cpaResult.cca_demo.c2_modified, 18)}
+                    <div style={{ paddingLeft: 12, wordBreak: 'break-all' }}>
+                      c₂' = 2·c₂ mod p = {trunc(cpaResult.cca_demo.c2_modified)}
                     </div>
                     <div style={{ marginTop: 4 }}>
                       Oracle returns:{' '}
